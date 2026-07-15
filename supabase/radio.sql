@@ -10,8 +10,32 @@ create table if not exists public.radio_profiles (
   language text not null default 'zh' check (language in ('zh', 'en')),
   model text not null default 'deepseek-v4-flash'
     check (model in ('deepseek-v4-flash', 'deepseek-v4-pro')),
+  playlist_provider text not null default '' check (playlist_provider in ('', 'youtube')),
+  playlist_url text not null default '' check (char_length(playlist_url) <= 500),
+  playlist_id text not null default '' check (char_length(playlist_id) <= 128),
   updated_at timestamptz not null default now()
 );
+
+-- 已经执行过旧版 radio.sql 的项目也可安全重复执行本文件。
+alter table public.radio_profiles add column if not exists playlist_provider text not null default '';
+alter table public.radio_profiles add column if not exists playlist_url text not null default '';
+alter table public.radio_profiles add column if not exists playlist_id text not null default '';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'radio_profiles_playlist_provider_check' and conrelid = 'public.radio_profiles'::regclass) then
+    alter table public.radio_profiles add constraint radio_profiles_playlist_provider_check
+      check (playlist_provider in ('', 'youtube'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'radio_profiles_playlist_url_check' and conrelid = 'public.radio_profiles'::regclass) then
+    alter table public.radio_profiles add constraint radio_profiles_playlist_url_check
+      check (char_length(playlist_url) <= 500);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'radio_profiles_playlist_id_check' and conrelid = 'public.radio_profiles'::regclass) then
+    alter table public.radio_profiles add constraint radio_profiles_playlist_id_check
+      check (char_length(playlist_id) <= 128);
+  end if;
+end $$;
 
 create table if not exists public.radio_tracks (
   id uuid primary key default gen_random_uuid(),

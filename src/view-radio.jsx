@@ -5,6 +5,7 @@ import {
   deleteRadioTrack,
   getDeepSeekKey,
   loadRadioSettings,
+  parseYouTubePlaylistUrl,
   radioApi,
   saveRadioProfile,
   setDeepSeekKey,
@@ -14,6 +15,7 @@ import {
 
 const { useState: _us, useEffect: _ue, useRef: _ur } = React;
 const MUSIC_VOLUME = 0.55;
+let youtubeApiPromise = null;
 
 function hueFor(track) {
   if (track && Number.isFinite(Number(track.hue))) return ((Math.round(Number(track.hue)) % 360) + 360) % 360;
@@ -23,9 +25,81 @@ function hueFor(track) {
   return hash % 360;
 }
 
+function loadYouTubeIframeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  if (youtubeApiPromise) return youtubeApiPromise;
+  youtubeApiPromise = new Promise((resolve, reject) => {
+    const previousReady = window.onYouTubeIframeAPIReady;
+    const timer = window.setTimeout(() => {
+      youtubeApiPromise = null;
+      reject(new Error('YouTube 播放器加载超时'));
+    }, 15000);
+    window.onYouTubeIframeAPIReady = () => {
+      try { previousReady?.(); } catch { /* ignore other integrations */ }
+      window.clearTimeout(timer);
+      if (window.YT?.Player) resolve(window.YT);
+      else reject(new Error('YouTube 播放器初始化失败'));
+    };
+    if (!document.querySelector('script[data-melo-youtube-api]')) {
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.dataset.meloYoutubeApi = '1';
+      script.onerror = () => {
+        window.clearTimeout(timer);
+        youtubeApiPromise = null;
+        reject(new Error('无法载入 YouTube 播放器'));
+      };
+      document.head.appendChild(script);
+    }
+  });
+  return youtubeApiPromise;
+}
+
+function YouTubePlaylistPlayer({ playlistId, playerRef, onReady, onStateChange, onError }) {
+  const mountRef = _ur(null);
+
+  _ue(() => {
+    if (!playlistId || !mountRef.current) return undefined;
+    let alive = true;
+    let player = null;
+    playerRef.current = null;
+    loadYouTubeIframeApi().then((YT) => {
+      if (!alive || !mountRef.current) return;
+      player = new YT.Player(mountRef.current, {
+        width: '100%',
+        height: '100%',
+        playerVars: {
+          listType: 'playlist',
+          list: playlistId,
+          playsinline: 1,
+          rel: 0,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: (event) => {
+            if (!alive) return;
+            playerRef.current = event.target;
+            onReady?.(event.target);
+          },
+          onStateChange: (event) => { if (alive) onStateChange?.(event.data); },
+          onError: () => { if (alive) onError?.('这个歌单暂时无法播放，请确认它不是私人歌单。'); },
+        },
+      });
+    }).catch((error) => { if (alive) onError?.(error.message); });
+    return () => {
+      alive = false;
+      if (playerRef.current === player) playerRef.current = null;
+      try { player?.destroy?.(); } catch { /* ignore */ }
+    };
+  }, [playlistId]);
+
+  return <div className="radio-youtube-frame"><div ref={mountRef} /></div>;
+}
+
 function RadioSettings({
   open, onClose, user, apiKey, setApiKeyState, model, setModel, taste, setTaste,
-  language, tracks, setTracks, onSaved,
+  language, tracks, setTracks, playlistUrl, setPlaylistUrl, onSaved,
 }) {
   const [keyDraft, setKeyDraft] = _us(apiKey);
   const [artist, setArtist] = _us('');
@@ -65,7 +139,7 @@ function RadioSettings({
     setBusy(true); setMessage('正在保存…');
     try {
       setApiKeyState(setDeepSeekKey(key, user.id));
-      await saveRadioProfile({ taste, language, model });
+      await saveRadioProfile({ taste, language, model, playlistUrl });
       if (file) {
         const row = await uploadRadioTrack(file, { artist, title });
         if (row) setTracks((items) => [row, ...items]);
@@ -94,6 +168,13 @@ function RadioSettings({
     setKeyDraft('');
     setMessage('当前标签页中的 Key 已清除。');
   };
+
+  let playlistPreview = null;
+  let playlistError = '';
+  if (String(playlistUrl || '').trim()) {
+    try { playlistPreview = parseYouTubePlaylistUrl(playlistUrl); }
+    catch (error) { playlistError = error.message; }
+  }
 
   return (
     <div className="auth-overlay" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
@@ -128,9 +209,26 @@ function RadioSettings({
             maxLength="6000" placeholder="例如：喜欢安静、克制、有空间感的音乐；工作时少人声…" />
         </label>
 
+        <div className="radio-source-section">
+          <div className="radio-library-head">
+            <div>
+              <div className="auth-label">方式 A · 导入在线歌单</div>
+              <div className="radio-config-note">支持 YouTube 与 YouTube Music 的公开或不公开歌单链接。</div>
+            </div>
+            {playlistPreview && <span className="radio-source-ready">已识别</span>}
+          </div>
+          <input className="radio-playlist-input" value={playlistUrl}
+            onChange={(event) => setPlaylistUrl(event.target.value)}
+            placeholder="粘贴 youtube.com 或 music.youtube.com 的歌单链接" maxLength="500" />
+          {playlistError && <div className="radio-config-note radio-config-warn">{playlistError}</div>}
+          <div className="radio-config-note">
+            账号登录由 YouTube 官方页面完成；如需登录，请点“在 YouTube 打开”完成后返回。本站不会收到你的 YouTube 密码。私人歌单暂不支持。
+          </div>
+        </div>
+
         <div className="radio-library-head">
           <div>
-            <div className="auth-label">私有曲库</div>
+            <div className="auth-label">方式 B · 上传私有音频</div>
             <div className="radio-config-note">音频直接上传到你的 Supabase 私有存储，单曲不超过 30 MB。</div>
           </div>
           <span>{tracks.length} 首</span>
@@ -153,7 +251,7 @@ function RadioSettings({
         )}
 
         {message && <div className="radio-config-message">{message}</div>}
-        <button className="btn btn-primary auth-submit" onClick={save} disabled={busy || !user}>
+        <button className="btn btn-primary auth-submit" onClick={save} disabled={busy || !user || !!playlistError}>
           {busy ? '处理中…' : file ? '保存设置并上传' : '保存设置'}
         </button>
       </div>
@@ -170,6 +268,7 @@ function RadioView() {
   const [model, setModel] = _us('deepseek-v4-flash');
   const [taste, setTaste] = _us('');
   const [tracks, setTracks] = _us([]);
+  const [playlistUrl, setPlaylistUrl] = _us('');
   const [input, setInput] = _us('');
   const [thinking, setThinking] = _us(false);
   const [log, setLog] = _us([]);
@@ -180,8 +279,17 @@ function RadioView() {
   const [err, setErr] = _us('');
   const [lang, setLang] = _us(() => localStorage.getItem('melo_lang') || localStorage.getItem('claudio_lang') || 'zh');
   const musicRef = _ur(null);
+  const youtubePlayerRef = _ur(null);
+  const pendingYoutubeActionRef = _ur('');
   const playTokenRef = _ur(0);
   const audioUnlockedRef = _ur(false);
+  const [youtubeReady, setYoutubeReady] = _us(false);
+  const [youtubePlaying, setYoutubePlaying] = _us(false);
+
+  let youtubePlaylist = null;
+  try { youtubePlaylist = parseYouTubePlaylistUrl(playlistUrl); }
+  catch { youtubePlaylist = null; }
+  const youtubePlaylistId = youtubePlaylist?.id || '';
 
   const setLangPersist = (value) => {
     setLang(value);
@@ -198,6 +306,7 @@ function RadioView() {
       setTaste(data.profile?.taste || '');
       setModel(data.profile?.model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash');
       if (data.profile?.language) setLangPersist(data.profile.language);
+      setPlaylistUrl(data.profile?.playlist_provider === 'youtube' ? (data.profile.playlist_url || '') : '');
       setTracks(data.tracks || []);
       setSetupError('');
     } catch (error) { setSetupError(error.message); }
@@ -227,7 +336,7 @@ function RadioView() {
       setUser(nextUser);
       if (nextUser) setApiKeyState(getDeepSeekKey(nextUser.id));
       if (event === 'SIGNED_OUT' || !nextUser) {
-        clearDeepSeekKey(); setApiKeyState(''); setTracks([]); setQueue([]); setNow(null);
+        clearDeepSeekKey(); setApiKeyState(''); setTracks([]); setPlaylistUrl(''); setQueue([]); setNow(null);
       }
     });
     return () => { alive = false; subscription?.subscription?.unsubscribe(); };
@@ -235,6 +344,11 @@ function RadioView() {
 
   _ue(() => { if (user) loadSettings(); }, [user?.id]);
   _ue(() => { if (musicRef.current) musicRef.current.volume = MUSIC_VOLUME; }, []);
+  _ue(() => {
+    setYoutubeReady(false);
+    setYoutubePlaying(false);
+    pendingYoutubeActionRef.current = '';
+  }, [youtubePlaylistId]);
 
   const unlockAudio = () => {
     if (audioUnlockedRef.current || !musicRef.current) return;
@@ -264,11 +378,48 @@ function RadioView() {
     return wasPlaying;
   };
 
+  const pauseYouTube = () => {
+    const player = youtubePlayerRef.current;
+    const wasPlaying = youtubePlaying;
+    try { player?.pauseVideo?.(); } catch { /* ignore */ }
+    return wasPlaying;
+  };
+
+  const executeYouTubeAction = (action) => {
+    if (!youtubePlaylistId || !action || action === 'none') return false;
+    const player = youtubePlayerRef.current;
+    if (!player) {
+      pendingYoutubeActionRef.current = action;
+      setErr('YouTube 播放器还在准备；如果浏览器阻止自动播放，请先在播放器里点一次播放。');
+      return false;
+    }
+    pendingYoutubeActionRef.current = '';
+    stopMusic(); setNow(null); setQueue([]);
+    try {
+      if (action === 'pause') player.pauseVideo();
+      else if (action === 'next') { player.nextVideo(); player.playVideo(); }
+      else if (action === 'previous') { player.previousVideo(); player.playVideo(); }
+      else if (action === 'shuffle') { player.setShuffle(true); player.playVideo(); }
+      else player.playVideo();
+      setErr('');
+      return true;
+    } catch {
+      setErr('无法控制 YouTube 播放器，请先在播放器里点一次播放。');
+      return false;
+    }
+  };
+
+  const handleYouTubeReady = () => {
+    setYoutubeReady(true);
+    const pending = pendingYoutubeActionRef.current;
+    if (pending) executeYouTubeAction(pending);
+  };
+
   const playAt = async (index, list = queue) => {
     const track = list[index];
     if (!track) return;
     const token = ++playTokenRef.current;
-    setIdx(index); setNow(track); stopMusic();
+    setIdx(index); setNow(track); stopMusic(); pauseYouTube();
     if (track.intro) setLog((items) => [...items, { role: 'melo', text: track.intro }]);
     await speak(track.intro);
     if (token !== playTokenRef.current) return;
@@ -286,7 +437,10 @@ function RadioView() {
     setInput(''); setErr(''); setThinking(true);
     setLog((items) => [...items, { role: 'you', text: message || '（随便放点）' }]);
     try {
-      const data = await radioApi('/chat', { key: apiKey, body: { text: message, lang, model } });
+      const data = await radioApi('/chat', {
+        key: apiKey,
+        body: { text: message, lang, model, hasYoutubePlaylist: !!youtubePlaylistId },
+      });
       setLog((items) => [...items, { role: 'melo', text: data.say }]);
       const playable = await Promise.all((data.tracks || []).map(async (track) => {
         try { return { ...track, url: await signedTrackUrl(track) }; }
@@ -294,12 +448,18 @@ function RadioView() {
       }));
       setThinking(false);
       if (playable.length) {
-        setQueue(playable); setIdx(0); stopMusic();
+        setQueue(playable); setIdx(0); stopMusic(); pauseYouTube();
         await speak(data.say); playAt(0, playable);
-      } else {
-        const resume = stopMusic();
+      } else if (data.playlistAction && data.playlistAction !== 'none' && youtubePlaylistId) {
+        stopMusic(); pauseYouTube(); setNow(null); setQueue([]);
         await speak(data.say);
-        if (resume) musicRef.current?.play().catch(() => {});
+        executeYouTubeAction(data.playlistAction);
+      } else {
+        const resumeMusic = stopMusic();
+        const resumeYouTube = pauseYouTube();
+        await speak(data.say);
+        if (resumeMusic) musicRef.current?.play().catch(() => {});
+        else if (resumeYouTube) executeYouTubeAction('play');
       }
     } catch (error) { setThinking(false); setErr(error.message); }
   };
@@ -318,6 +478,7 @@ function RadioView() {
       <RadioSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} user={user}
         apiKey={apiKey} setApiKeyState={setApiKeyState} model={model} setModel={setModel}
         taste={taste} setTaste={setTaste} language={lang} tracks={tracks} setTracks={setTracks}
+        playlistUrl={playlistUrl} setPlaylistUrl={setPlaylistUrl}
         onSaved={() => setSetupError('')} />
 
       <div className="hero">
@@ -361,10 +522,30 @@ function RadioView() {
               {now.unresolved && <div className="radio-warn">无法取得这首歌的临时播放链接，已跳过。</div>}
             </div>
           </div>
-        ) : <div className="radio-now-empty">{tracks.length ? '跟 Melo 说句话，开始一段只属于你的电台。' : '先在设置里上传几首自己的音乐，再让 Melo 排一段。'}</div>}
+        ) : <div className="radio-now-empty">{
+          tracks.length ? '跟 Melo 说句话，开始一段只属于你的电台。'
+            : youtubePlaylistId ? '歌单已导入。先在下方官方播放器点一次播放，之后就可以让 Melo 控制。'
+              : '在设置里导入 YouTube 歌单或上传自己的音乐，再让 Melo 开始播放。'
+        }</div>}
         <audio ref={musicRef} controls onEnded={() => { setPlaying(false); if (idx + 1 < queue.length) playAt(idx + 1); }}
           onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} className="radio-audio" />
       </div>
+
+      {youtubePlaylistId && <div className="radio-external-player">
+        <div className="radio-external-head">
+          <div>
+            <div className="radio-now-kicker">YOUTUBE PLAYLIST</div>
+            <div className="radio-external-title">你的在线歌单</div>
+          </div>
+          <a href={youtubePlaylist.url} target="_blank" rel="noreferrer">在 YouTube 打开 ↗</a>
+        </div>
+        <YouTubePlaylistPlayer playlistId={youtubePlaylistId} playerRef={youtubePlayerRef}
+          onReady={handleYouTubeReady}
+          onStateChange={(state) => setYoutubePlaying(state === 1)}
+          onError={setErr} />
+        {!youtubeReady && <div className="radio-config-note">正在载入官方播放器…</div>}
+        <div className="radio-config-note">第一次请手动点一次播放；如需登录，先点右上角“在 YouTube 打开”。之后可以直接对 Melo 说“播放”“下一首”或“随机播放”。</div>
+      </div>}
 
       {queue.length > 1 && <div className="radio-queue">
         <div className="radio-queue-label">接下来</div>

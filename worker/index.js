@@ -94,6 +94,7 @@ async function handleApi(request, env, ctx) {
       ok: true,
       brain: 'DeepSeek BYOK',
       musicProvider: 'supabase-storage',
+      musicProviders: ['supabase-storage', 'youtube-playlist'],
       ttsProvider: 'browser',
       models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
     });
@@ -120,6 +121,7 @@ async function handleApi(request, env, ctx) {
 
   const text = String(body.text || '').trim().slice(0, 1200);
   const lang = body.lang === 'en' ? 'en' : 'zh';
+  const hasExternalPlaylist = body.hasYoutubePlaylist === true;
   const radio = await loadRadioContext(env, token, user.id);
   const candidates = sampleTracks(radio.tracks, radio.plays);
   const prompt = buildRadioPrompt({
@@ -129,14 +131,16 @@ async function handleApi(request, env, ctx) {
     tracks: candidates,
     messages: radio.messages,
     plays: radio.plays,
+    hasExternalPlaylist,
   });
-  const result = await askDeepSeek({ apiKey, model, prompt, candidates });
+  const result = await askDeepSeek({ apiKey, model, prompt, candidates, hasExternalPlaylist });
 
   ctx.waitUntil(persistRadioTurn(env, token, user.id, text, result).catch(() => {}));
   return json({
     say: result.reply,
     sayAudio: null,
     tracks: result.set,
+    playlistAction: result.playlistAction,
     model,
   });
 }

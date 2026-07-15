@@ -3,6 +3,27 @@ const DEEPSEEK_OWNER_KEY = 'future_deepseek_key_owner';
 const RADIO_BUCKET = 'radio-audio';
 const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
 const ALLOWED_EXT = new Set(['mp3', 'm4a', 'aac', 'ogg', 'wav', 'flac']);
+const YOUTUBE_HOSTS = new Set(['youtube.com', 'www.youtube.com', 'music.youtube.com', 'm.youtube.com', 'youtu.be']);
+
+export function parseYouTubePlaylistUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  let url;
+  try { url = new URL(raw); }
+  catch { throw new Error('请输入完整的 YouTube 或 YouTube Music 歌单链接'); }
+  if (url.protocol !== 'https:' || !YOUTUBE_HOSTS.has(url.hostname.toLowerCase())) {
+    throw new Error('目前只支持 YouTube 或 YouTube Music 歌单链接');
+  }
+  const playlistId = String(url.searchParams.get('list') || '').trim();
+  if (!/^[A-Za-z0-9_-]{10,128}$/.test(playlistId)) {
+    throw new Error('链接中没有找到有效的 YouTube 歌单 ID');
+  }
+  return {
+    provider: 'youtube',
+    id: playlistId,
+    url: `https://www.youtube.com/playlist?list=${encodeURIComponent(playlistId)}`,
+  };
+}
 
 function client() {
   if (!window.sbClient) throw new Error('Supabase 尚未配置');
@@ -18,6 +39,9 @@ async function authContext() {
 
 function friendlyError(error) {
   const message = String(error?.message || error || '操作失败');
+  if (/playlist_(provider|url|id)/i.test(message)) {
+    return new Error('歌单功能尚未初始化，请先在 Supabase 执行 supabase/radio-playlist-migration.sql');
+  }
   if (/does not exist|schema cache|PGRST20[45]|radio_/i.test(message)) {
     return new Error('电台数据表尚未建立，请先在 Supabase 执行 supabase/radio.sql');
   }
@@ -76,7 +100,9 @@ export async function loadRadioSettings() {
   const { sb, user } = await authContext();
   try {
     const [profileResult, tracksResult] = await Promise.all([
-      sb.from('radio_profiles').select('taste,language,model').eq('user_id', user.id).maybeSingle(),
+      sb.from('radio_profiles')
+        .select('taste,language,model,playlist_provider,playlist_url,playlist_id')
+        .eq('user_id', user.id).maybeSingle(),
       sb.from('radio_tracks').select('id,artist,title,storage_path,mime_type,size_bytes,created_at')
         .eq('user_id', user.id).order('created_at', { ascending: false }),
     ]);
@@ -92,13 +118,17 @@ export async function loadRadioSettings() {
   }
 }
 
-export async function saveRadioProfile({ taste, language, model }) {
+export async function saveRadioProfile({ taste, language, model, playlistUrl = '' }) {
   const { sb, user } = await authContext();
+  const playlist = String(playlistUrl || '').trim() ? parseYouTubePlaylistUrl(playlistUrl) : null;
   const { error } = await sb.from('radio_profiles').upsert({
     user_id: user.id,
     taste: String(taste || '').trim().slice(0, 6000),
     language: language === 'en' ? 'en' : 'zh',
     model: model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash',
+    playlist_provider: playlist?.provider || '',
+    playlist_url: playlist?.url || '',
+    playlist_id: playlist?.id || '',
     updated_at: new Date().toISOString(),
   });
   if (error) throw friendlyError(error);

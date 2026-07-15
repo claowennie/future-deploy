@@ -23,9 +23,12 @@ function playsSection(plays) {
     .join('、');
 }
 
-function candidatesSection(tracks) {
+function candidatesSection(tracks, hasExternalPlaylist) {
   if (!Array.isArray(tracks) || tracks.length === 0) {
-    return '[]\n当前没有可播放曲目。不要编造歌曲或链接，把 set 留空，并自然提醒 TA 先在电台设置里上传自己的音乐。';
+    if (hasExternalPlaylist) {
+      return '[]\n当前没有私有曲库候选，但 TA 已连接 YouTube 歌单。不要编造歌曲名；需要播放时使用 playlistAction。';
+    }
+    return '[]\n当前没有可播放曲目。不要编造歌曲或链接，把 set 留空，并自然提醒 TA 在电台设置里上传音乐或导入 YouTube 歌单。';
   }
   const safe = tracks.slice(0, 80).map((track) => ({
     trackId: String(track.id),
@@ -42,6 +45,7 @@ export function buildRadioPrompt({
   tracks = [],
   messages = [],
   plays = [],
+  hasExternalPlaylist = false,
   now = new Date(),
 } = {}) {
   const maxSet = Math.min(8, tracks.length);
@@ -68,7 +72,10 @@ ${conversationSection(messages)}
 ${playsSection(plays)}
 
 【当前可播放候选曲目 JSON】
-${candidatesSection(tracks)}
+${candidatesSection(tracks, hasExternalPlaylist)}
+
+【外部歌单】
+${hasExternalPlaylist ? '已连接 YouTube / YouTube Music 歌单；你不知道其中的具体曲目，不能编造歌名。' : '未连接。'}
 
 【此刻】
 ${now.toLocaleString('zh-CN', { timeZone: 'Asia/Taipei' })}
@@ -79,6 +86,7 @@ ${clip(text, 1200) || '随便放点适合现在的音乐'}
 只输出一个 JSON 对象，不要 markdown，不要额外文字。JSON 结构必须是：
 {
   "reply": "先接住 TA 的一句自然回应，1-2 句",
+  "playlistAction": "none | play | pause | next | previous | shuffle",
   "set": [
     {
       "trackId": "必须逐字复制候选曲目的 trackId",
@@ -90,6 +98,9 @@ ${clip(text, 1200) || '随便放点适合现在的音乐'}
 
 硬性要求：
 - 只能选择候选 JSON 中真实存在的 trackId，绝不编造歌曲、URL 或 trackId。
+- playlistAction 只用于已连接的 YouTube 歌单：普通播放用 play，暂停用 pause，下一首用 next，上一首用 previous，随机播放用 shuffle，不操作则为 none。
+- playlistAction 不是 none 时，set 必须是 []；使用私有曲库 set 时，playlistAction 必须是 none。
+- 不知道 YouTube 歌单的曲目明细，不要声称正在播放某一首具体歌曲。
 - set 最多 ${maxSet} 首；候选充足且 TA 明确要听歌时，通常排 ${preferredMin}-${maxSet} 首；只是聊天时可以是 []。
 - 同一 trackId 不能重复。
 - hue 是 0-359 的整数，用于播放器色相。

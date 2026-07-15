@@ -6,7 +6,8 @@
 - Supabase Auth 验证每个请求，数据库 RLS 隔离不同账号
 - 每位用户使用自己的 DeepSeek API Key（BYOK）
 - Key 只保存在当前标签页的 `sessionStorage`，不写入 Supabase 或 Worker 配置
-- 私有曲库使用 Supabase Storage；浏览器负责朗读串词
+- 可导入 YouTube / YouTube Music 公开或不公开歌单，也可把私有音频上传到 Supabase Storage
+- 浏览器负责朗读串词；YouTube 官方播放器负责在线歌单播放
 
 原目录 `future.v2` 不参与本项目的构建或部署。
 
@@ -15,6 +16,7 @@
 ```text
 Browser
   ├─ Supabase Auth / database / private audio storage
+  ├─ YouTube official embedded playlist player
   └─ Cloudflare Worker /api/radio/*
        ├─ verifies the Supabase access token
        ├─ reads radio context through the user's JWT + RLS
@@ -28,6 +30,7 @@ Worker 不保存、打印或回传 DeepSeek Key，也不拥有 Supabase `service
 复用现有 Supabase 项目与原应用的数据表、登录配置。然后在 Supabase Dashboard → SQL Editor 完整执行：
 
 1. [`supabase/radio.sql`](./supabase/radio.sql)：电台资料、曲目、消息、播放历史、RLS 和私有音频桶
+   - 已经执行过旧版脚本时，只需补跑 [`supabase/radio-playlist-migration.sql`](./supabase/radio-playlist-migration.sql)
 2. [`supabase/delete_user.sql`](./supabase/delete_user.sql)：账号自助删除函数
 3. 如需 Web Push，再按 [`supabase/WEB_PUSH_SETUP.md`](./supabase/WEB_PUSH_SETUP.md) 配置
 
@@ -79,7 +82,7 @@ npm run dev:worker
 npm run dev
 ```
 
-打开 `http://localhost:5173`。登录后进入 Melo 设置，输入自己的 DeepSeek Key、保存偏好并上传音频。Key 在关闭标签页或退出登录后会清除。
+打开 `http://localhost:5173`。登录后进入 Melo 设置，输入自己的 DeepSeek Key，并导入 YouTube / YouTube Music 歌单或上传音频。Key 在关闭标签页或退出登录后会清除。
 
 ## 4. 部署到现有 Cloudflare Worker
 
@@ -152,7 +155,7 @@ POST /api/radio/chat
 
 ## 与自用版的差异
 
-部署版不包含 Claude CLI、Express 中枢、Python TTS、本机音乐目录、网易云 Cookie、QQ 音乐登录态或本地配置文件。语音使用浏览器 `speechSynthesis`；音乐只来自当前登录账号的 Supabase 私有曲库。
+部署版不包含 Claude CLI、Express 中枢、Python TTS、本机音乐目录、网易云 Cookie、QQ 音乐登录态或本地配置文件。语音使用浏览器 `speechSynthesis`；音乐来自当前登录账号的 Supabase 私有曲库，或用户导入的 YouTube / YouTube Music 歌单。
 
 ## License
 

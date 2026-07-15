@@ -1,5 +1,6 @@
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const ALLOWED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-v4-pro']);
+const PLAYLIST_ACTIONS = new Set(['none', 'play', 'pause', 'next', 'previous', 'shuffle']);
 
 export class DeepSeekError extends Error {
   constructor(message, status = 502, code = 'deepseek_error') {
@@ -42,7 +43,7 @@ const boundedText = (value, max, field) => {
   return text.slice(0, max);
 };
 
-export function validateRadioPayload(payload, candidates = []) {
+export function validateRadioPayload(payload, candidates = [], { hasExternalPlaylist = false } = {}) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new RadioOutputError('响应必须是 JSON 对象');
   }
@@ -50,6 +51,10 @@ export function validateRadioPayload(payload, candidates = []) {
   const reply = boundedText(payload.reply, 800, 'reply');
   if (!Array.isArray(payload.set)) throw new RadioOutputError('set 必须是数组');
   if (payload.set.length > 8) throw new RadioOutputError('set 最多 8 首');
+  const playlistAction = String(payload.playlistAction || 'none').trim().toLowerCase();
+  if (!PLAYLIST_ACTIONS.has(playlistAction)) throw new RadioOutputError('playlistAction 不受支持');
+  if (playlistAction !== 'none' && !hasExternalPlaylist) throw new RadioOutputError('当前没有外部歌单');
+  if (playlistAction !== 'none' && payload.set.length) throw new RadioOutputError('不能同时播放私有曲库和外部歌单');
 
   const byId = new Map(candidates.map((track) => [String(track.id), track]));
   const seen = new Set();
@@ -73,7 +78,7 @@ export function validateRadioPayload(payload, candidates = []) {
     };
   });
 
-  return { reply, set };
+  return { reply, set, playlistAction };
 }
 
 function mapHttpError(status) {
@@ -114,7 +119,7 @@ async function requestCompletion({ apiKey, model, messages, maxTokens = 2600 }) 
   return data?.choices?.[0]?.message?.content || '';
 }
 
-export async function askDeepSeek({ apiKey, model, prompt, candidates }) {
+export async function askDeepSeek({ apiKey, model, prompt, candidates, hasExternalPlaylist = false }) {
   let lastError = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const content = await requestCompletion({
@@ -126,7 +131,7 @@ export async function askDeepSeek({ apiKey, model, prompt, candidates }) {
       ],
     });
     try {
-      return validateRadioPayload(parseContent(content), candidates);
+      return validateRadioPayload(parseContent(content), candidates, { hasExternalPlaylist });
     } catch (error) {
       lastError = error;
     }
