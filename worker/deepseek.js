@@ -1,6 +1,9 @@
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const ALLOWED_MODELS = new Set(['deepseek-v4-flash', 'deepseek-v4-pro']);
 const PLAYLIST_ACTIONS = new Set(['none', 'play', 'pause', 'next', 'previous', 'shuffle']);
+const COMPANION_ACTIONS = new Set([
+  'none', 'play_daily', 'search_and_play', 'pause', 'resume', 'stop', 'next', 'previous',
+]);
 
 export class DeepSeekError extends Error {
   constructor(message, status = 502, code = 'deepseek_error') {
@@ -43,7 +46,10 @@ const boundedText = (value, max, field) => {
   return text.slice(0, max);
 };
 
-export function validateRadioPayload(payload, candidates = [], { hasExternalPlaylist = false } = {}) {
+export function validateRadioPayload(payload, candidates = [], {
+  hasExternalPlaylist = false,
+  hasCompanion = false,
+} = {}) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new RadioOutputError('响应必须是 JSON 对象');
   }
@@ -55,6 +61,16 @@ export function validateRadioPayload(payload, candidates = [], { hasExternalPlay
   if (!PLAYLIST_ACTIONS.has(playlistAction)) throw new RadioOutputError('playlistAction 不受支持');
   if (playlistAction !== 'none' && !hasExternalPlaylist) throw new RadioOutputError('当前没有外部歌单');
   if (playlistAction !== 'none' && payload.set.length) throw new RadioOutputError('不能同时播放私有曲库和外部歌单');
+  const companionAction = String(payload.companionAction || 'none').trim().toLowerCase();
+  if (!COMPANION_ACTIONS.has(companionAction)) throw new RadioOutputError('companionAction 不受支持');
+  if (companionAction !== 'none' && !hasCompanion) throw new RadioOutputError('当前没有连接本机桥');
+  if (companionAction !== 'none' && (playlistAction !== 'none' || payload.set.length)) {
+    throw new RadioOutputError('一次只能控制一个音乐来源');
+  }
+  const companionQuery = String(payload.companionQuery || '').trim().slice(0, 120);
+  if (companionAction === 'search_and_play' && !companionQuery) {
+    throw new RadioOutputError('search_and_play 必须提供 companionQuery');
+  }
 
   const byId = new Map(candidates.map((track) => [String(track.id), track]));
   const seen = new Set();
@@ -78,7 +94,7 @@ export function validateRadioPayload(payload, candidates = [], { hasExternalPlay
     };
   });
 
-  return { reply, set, playlistAction };
+  return { reply, set, playlistAction, companionAction, companionQuery };
 }
 
 function mapHttpError(status) {
@@ -119,7 +135,9 @@ async function requestCompletion({ apiKey, model, messages, maxTokens = 2600 }) 
   return data?.choices?.[0]?.message?.content || '';
 }
 
-export async function askDeepSeek({ apiKey, model, prompt, candidates, hasExternalPlaylist = false }) {
+export async function askDeepSeek({
+  apiKey, model, prompt, candidates, hasExternalPlaylist = false, hasCompanion = false,
+}) {
   let lastError = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const content = await requestCompletion({
@@ -131,7 +149,7 @@ export async function askDeepSeek({ apiKey, model, prompt, candidates, hasExtern
       ],
     });
     try {
-      return validateRadioPayload(parseContent(content), candidates, { hasExternalPlaylist });
+      return validateRadioPayload(parseContent(content), candidates, { hasExternalPlaylist, hasCompanion });
     } catch (error) {
       lastError = error;
     }

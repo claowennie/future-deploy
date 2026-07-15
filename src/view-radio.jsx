@@ -12,6 +12,14 @@ import {
   signedTrackUrl,
   uploadRadioTrack,
 } from './radio-client.js';
+import {
+  checkCompanion,
+  clearCompanionConfig,
+  DEFAULT_COMPANION_URL,
+  getCompanionConfig,
+  sendCompanionCommand,
+  setCompanionConfig,
+} from './companion-client.js';
 
 const { useState: _us, useEffect: _ue, useRef: _ur } = React;
 const MUSIC_VOLUME = 0.55;
@@ -100,6 +108,8 @@ function YouTubePlaylistPlayer({ playlistId, playerRef, onReady, onStateChange, 
 function RadioSettings({
   open, onClose, user, apiKey, setApiKeyState, model, setModel, taste, setTaste,
   language, tracks, setTracks, playlistUrl, setPlaylistUrl, onSaved,
+  companionUrl, setCompanionUrl, companionToken, setCompanionToken,
+  companionStatus, onTestCompanion, onDisconnectCompanion,
 }) {
   const [keyDraft, setKeyDraft] = _us(apiKey);
   const [artist, setArtist] = _us('');
@@ -169,6 +179,20 @@ function RadioSettings({
     setMessage('当前标签页中的 Key 已清除。');
   };
 
+  const testCompanion = async () => {
+    setBusy(true); setMessage('正在连接本机桥…');
+    try {
+      await onTestCompanion({ url: companionUrl, token: companionToken });
+      setMessage('本机桥已连接。现在可以让 Melo 控制这台电脑上的网易云播放。');
+    } catch (error) { setMessage(error.message); }
+    finally { setBusy(false); }
+  };
+
+  const disconnectCompanion = () => {
+    onDisconnectCompanion();
+    setMessage('已断开本机桥，配对码已从当前标签页清除。');
+  };
+
   let playlistPreview = null;
   let playlistError = '';
   if (String(playlistUrl || '').trim()) {
@@ -228,7 +252,28 @@ function RadioSettings({
 
         <div className="radio-library-head">
           <div>
-            <div className="auth-label">方式 B · 上传私有音频</div>
+            <div className="auth-label">方式 B · 网易云桌面桥（作品演示）</div>
+            <div className="radio-config-note">可选功能。音乐与登录凭证都留在你的电脑；网站只发送白名单播放指令。</div>
+          </div>
+          <span className={companionStatus === 'online' ? 'radio-source-ready' : ''}>
+            {companionStatus === 'online' ? '已连接' : companionStatus === 'checking' ? '连接中' : '未连接'}
+          </span>
+        </div>
+        <div className="radio-companion-grid">
+          <input value={companionUrl} onChange={(event) => setCompanionUrl(event.target.value)}
+            placeholder={DEFAULT_COMPANION_URL} autoComplete="off" spellCheck="false" />
+          <input type="password" value={companionToken} onChange={(event) => setCompanionToken(event.target.value)}
+            placeholder="粘贴 future-companion 显示的本机配对码" autoComplete="off" spellCheck="false" />
+        </div>
+        <div className="radio-setting-actions">
+          <button className="btn" onClick={testCompanion} disabled={busy || !companionToken}>测试本机桥</button>
+          <button className="btn" onClick={disconnectCompanion} disabled={busy || !companionToken}>断开</button>
+        </div>
+        <div className="radio-config-note">配对码只保存在当前标签页，不会上传到 Supabase、DeepSeek 或 Cloudflare。</div>
+
+        <div className="radio-library-head">
+          <div>
+            <div className="auth-label">方式 C · 上传私有音频</div>
             <div className="radio-config-note">音频直接上传到你的 Supabase 私有存储，单曲不超过 30 MB。</div>
           </div>
           <span>{tracks.length} 首</span>
@@ -278,6 +323,11 @@ function RadioView() {
   const [playing, setPlaying] = _us(false);
   const [err, setErr] = _us('');
   const [lang, setLang] = _us(() => localStorage.getItem('melo_lang') || localStorage.getItem('claudio_lang') || 'zh');
+  const [companionUrl, setCompanionUrl] = _us(() => getCompanionConfig().url);
+  const [companionToken, setCompanionToken] = _us(() => getCompanionConfig().token);
+  const [companionStatus, setCompanionStatus] = _us(() => getCompanionConfig().token ? 'checking' : 'disconnected');
+  const [companionActivity, setCompanionActivity] = _us('');
+  const [companionBusy, setCompanionBusy] = _us(false);
   const musicRef = _ur(null);
   const youtubePlayerRef = _ur(null);
   const pendingYoutubeActionRef = _ur('');
@@ -318,6 +368,17 @@ function RadioView() {
       .then((response) => response.ok ? response.json() : Promise.reject(new Error()))
       .then(() => { if (alive) setWorkerStatus('online'); })
       .catch(() => { if (alive) setWorkerStatus('offline'); });
+    return () => { alive = false; };
+  }, []);
+
+  _ue(() => {
+    const config = getCompanionConfig();
+    if (!config.token) return undefined;
+    let alive = true;
+    setCompanionStatus('checking');
+    checkCompanion(config)
+      .then(() => { if (alive) setCompanionStatus('online'); })
+      .catch(() => { if (alive) setCompanionStatus('offline'); });
     return () => { alive = false; };
   }, []);
 
@@ -385,6 +446,51 @@ function RadioView() {
     return wasPlaying;
   };
 
+  const testCompanion = async (config = { url: companionUrl, token: companionToken }) => {
+    setCompanionStatus('checking');
+    try {
+      const saved = setCompanionConfig(config);
+      setCompanionUrl(saved.url);
+      setCompanionToken(saved.token);
+      const result = await checkCompanion(saved);
+      setCompanionStatus('online');
+      return result;
+    } catch (error) {
+      setCompanionStatus('offline');
+      throw error;
+    }
+  };
+
+  const disconnectCompanion = () => {
+    clearCompanionConfig();
+    setCompanionToken('');
+    setCompanionStatus('disconnected');
+    setCompanionActivity('');
+  };
+
+  const executeCompanionAction = async (action, query = '') => {
+    if (companionStatus !== 'online') throw new Error('本机桥尚未连接，请先在设置里测试连接');
+    setCompanionBusy(true); setErr('');
+    try {
+      const result = await sendCompanionCommand({ url: companionUrl, token: companionToken }, action, query);
+      const track = result.track;
+      if (track?.name) {
+        const artist = Array.isArray(track.artists) ? track.artists.filter(Boolean).join(' / ') : '';
+        setCompanionActivity(`正在播放：${track.name}${artist ? ` · ${artist}` : ''}`);
+      } else {
+        const labels = {
+          pause: '已暂停', resume: '继续播放', stop: '已停止', next: '已切到下一首', previous: '已切到上一首',
+        };
+        setCompanionActivity(labels[action] || '指令已发送');
+      }
+      return result;
+    } catch (error) {
+      if (/配对码|401|没有连上/.test(error.message)) setCompanionStatus('offline');
+      setErr(error.message);
+      throw error;
+    } finally { setCompanionBusy(false); }
+  };
+
   const executeYouTubeAction = (action) => {
     if (!youtubePlaylistId || !action || action === 'none') return false;
     const player = youtubePlayerRef.current;
@@ -439,7 +545,13 @@ function RadioView() {
     try {
       const data = await radioApi('/chat', {
         key: apiKey,
-        body: { text: message, lang, model, hasYoutubePlaylist: !!youtubePlaylistId },
+        body: {
+          text: message,
+          lang,
+          model,
+          hasYoutubePlaylist: !!youtubePlaylistId,
+          hasCompanion: companionStatus === 'online',
+        },
       });
       setLog((items) => [...items, { role: 'melo', text: data.say }]);
       const playable = await Promise.all((data.tracks || []).map(async (track) => {
@@ -450,6 +562,10 @@ function RadioView() {
       if (playable.length) {
         setQueue(playable); setIdx(0); stopMusic(); pauseYouTube();
         await speak(data.say); playAt(0, playable);
+      } else if (data.companionAction && data.companionAction !== 'none' && companionStatus === 'online') {
+        stopMusic(); pauseYouTube(); setNow(null); setQueue([]);
+        await speak(data.say);
+        await executeCompanionAction(data.companionAction, data.companionQuery);
       } else if (data.playlistAction && data.playlistAction !== 'none' && youtubePlaylistId) {
         stopMusic(); pauseYouTube(); setNow(null); setQueue([]);
         await speak(data.say);
@@ -479,6 +595,10 @@ function RadioView() {
         apiKey={apiKey} setApiKeyState={setApiKeyState} model={model} setModel={setModel}
         taste={taste} setTaste={setTaste} language={lang} tracks={tracks} setTracks={setTracks}
         playlistUrl={playlistUrl} setPlaylistUrl={setPlaylistUrl}
+        companionUrl={companionUrl} setCompanionUrl={setCompanionUrl}
+        companionToken={companionToken} setCompanionToken={setCompanionToken}
+        companionStatus={companionStatus} onTestCompanion={testCompanion}
+        onDisconnectCompanion={disconnectCompanion}
         onSaved={() => setSetupError('')} />
 
       <div className="hero">
@@ -524,12 +644,37 @@ function RadioView() {
           </div>
         ) : <div className="radio-now-empty">{
           tracks.length ? '跟 Melo 说句话，开始一段只属于你的电台。'
+            : companionStatus === 'online' ? '网易云本机桥已连接。可以说“播放每日推荐”或“在网易云播放起风了”。'
             : youtubePlaylistId ? '歌单已导入。先在下方官方播放器点一次播放，之后就可以让 Melo 控制。'
-              : '在设置里导入 YouTube 歌单或上传自己的音乐，再让 Melo 开始播放。'
+              : '在设置里连接网易云桌面桥、导入 YouTube 歌单或上传自己的音乐，再让 Melo 开始播放。'
         }</div>}
         <audio ref={musicRef} controls onEnded={() => { setPlaying(false); if (idx + 1 < queue.length) playAt(idx + 1); }}
           onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} className="radio-audio" />
       </div>
+
+      {companionToken && <div className={`radio-external-player radio-companion-player is-${companionStatus}`}>
+        <div className="radio-external-head">
+          <div>
+            <div className="radio-now-kicker">NETEASE LOCAL COMPANION</div>
+            <div className="radio-external-title">网易云桌面桥</div>
+          </div>
+          <span className="radio-companion-state">
+            {companionStatus === 'online' ? '本机已连接' : companionStatus === 'checking' ? '正在连接…' : '本机未连接'}
+          </span>
+        </div>
+        {companionActivity && <div className="radio-companion-activity">{companionActivity}</div>}
+        <div className="radio-companion-actions">
+          <button onClick={() => executeCompanionAction('play_daily').catch(() => {})}
+            disabled={companionStatus !== 'online' || companionBusy}>每日推荐</button>
+          <button onClick={() => executeCompanionAction('pause').catch(() => {})}
+            disabled={companionStatus !== 'online' || companionBusy}>暂停</button>
+          <button onClick={() => executeCompanionAction('resume').catch(() => {})}
+            disabled={companionStatus !== 'online' || companionBusy}>继续</button>
+          <button onClick={() => executeCompanionAction('next').catch(() => {})}
+            disabled={companionStatus !== 'online' || companionBusy}>下一首</button>
+        </div>
+        <div className="radio-config-note">这是作品演示功能：网页只把结构化指令发到 127.0.0.1，网易云登录与真实播放都由你的电脑完成。</div>
+      </div>}
 
       {youtubePlaylistId && <div className="radio-external-player">
         <div className="radio-external-head">

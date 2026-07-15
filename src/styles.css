@@ -3213,6 +3213,42 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
 .radio-external-title { color: var(--ink); font-size: 16px; font-weight: 600; margin-top: 2px; }
 .radio-external-head a { flex: none; color: var(--accent-ink); font-size: 12px; text-decoration: none; }
 .radio-external-head a:hover { text-decoration: underline; }
+.radio-companion-player {
+  background:
+    radial-gradient(100% 120% at 0 0, color-mix(in srgb, var(--accent-soft) 72%, transparent), transparent 62%),
+    var(--surface);
+}
+.radio-companion-player.is-online { border-color: color-mix(in srgb, var(--success) 45%, var(--line)); }
+.radio-companion-state {
+  flex: none;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--bg-dim);
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.radio-companion-player.is-online .radio-companion-state {
+  color: var(--success);
+  background: var(--success-soft);
+}
+.radio-companion-activity {
+  margin-bottom: 10px;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+.radio-companion-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.radio-companion-actions button {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: var(--surface);
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.radio-companion-actions button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-ink); }
+.radio-companion-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .radio-youtube-frame {
   width: 100%; min-height: 200px; aspect-ratio: 16 / 9;
   overflow: hidden; border-radius: 10px; background: #111;
@@ -3304,6 +3340,12 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
 .radio-setting-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .radio-source-section { margin-top: 2px; }
 .radio-playlist-input { margin-top: 12px; }
+.radio-companion-grid {
+  display: grid;
+  grid-template-columns: .8fr 1.2fr;
+  gap: 8px;
+  margin-top: 12px;
+}
 .radio-library-head {
   display: flex;
   align-items: flex-start;
@@ -3371,6 +3413,7 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
 @media (max-width: 680px) {
   .radio-hero-right { flex-wrap: wrap; justify-content: flex-end; }
   .radio-upload-grid { grid-template-columns: 1fr; }
+  .radio-companion-grid { grid-template-columns: 1fr; }
   .radio-settings-modal { max-height: 92vh; }
 }
 

@@ -94,7 +94,7 @@ async function handleApi(request, env, ctx) {
       ok: true,
       brain: 'DeepSeek BYOK',
       musicProvider: 'supabase-storage',
-      musicProviders: ['supabase-storage', 'youtube-playlist'],
+      musicProviders: ['supabase-storage', 'youtube-playlist', 'netease-local-companion'],
       ttsProvider: 'browser',
       models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
     });
@@ -122,6 +122,7 @@ async function handleApi(request, env, ctx) {
   const text = String(body.text || '').trim().slice(0, 1200);
   const lang = body.lang === 'en' ? 'en' : 'zh';
   const hasExternalPlaylist = body.hasYoutubePlaylist === true;
+  const hasCompanion = body.hasCompanion === true;
   const radio = await loadRadioContext(env, token, user.id);
   const candidates = sampleTracks(radio.tracks, radio.plays);
   const prompt = buildRadioPrompt({
@@ -132,8 +133,11 @@ async function handleApi(request, env, ctx) {
     messages: radio.messages,
     plays: radio.plays,
     hasExternalPlaylist,
+    hasCompanion,
   });
-  const result = await askDeepSeek({ apiKey, model, prompt, candidates, hasExternalPlaylist });
+  const result = await askDeepSeek({
+    apiKey, model, prompt, candidates, hasExternalPlaylist, hasCompanion,
+  });
 
   ctx.waitUntil(persistRadioTurn(env, token, user.id, text, result).catch(() => {}));
   return json({
@@ -141,6 +145,8 @@ async function handleApi(request, env, ctx) {
     sayAudio: null,
     tracks: result.set,
     playlistAction: result.playlistAction,
+    companionAction: result.companionAction,
+    companionQuery: result.companionQuery,
     model,
   });
 }

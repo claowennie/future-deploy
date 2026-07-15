@@ -53,6 +53,8 @@ assert.deepEqual(result, {
     hue: 5,
   }],
   playlistAction: 'none',
+  companionAction: 'none',
+  companionQuery: '',
 });
 
 const playlistPrompt = buildRadioPrompt({
@@ -73,10 +75,39 @@ assert.deepEqual(validateRadioPayload({
   reply: 'Starting your playlist.',
   set: [],
   playlistAction: 'shuffle',
+  companionAction: 'none',
+  companionQuery: '',
 });
 assert.throws(() => validateRadioPayload({
   reply: 'No playlist.',
   playlistAction: 'play',
+  set: [],
+}, []), RadioOutputError);
+
+const companionPrompt = buildRadioPrompt({
+  text: '在网易云播放起风了',
+  tracks: [],
+  hasCompanion: true,
+  now: new Date('2026-07-15T12:00:00Z'),
+});
+assert.match(companionPrompt, /网易云本机桥/);
+assert.match(companionPrompt, /search_and_play/);
+assert.deepEqual(validateRadioPayload({
+  reply: '我让本机播放器去找这首歌。',
+  playlistAction: 'none',
+  companionAction: 'search_and_play',
+  companionQuery: '起风了',
+  set: [],
+}, [], { hasCompanion: true }), {
+  reply: '我让本机播放器去找这首歌。',
+  set: [],
+  playlistAction: 'none',
+  companionAction: 'search_and_play',
+  companionQuery: '起风了',
+});
+assert.throws(() => validateRadioPayload({
+  reply: 'No bridge.',
+  companionAction: 'next',
   set: [],
 }, []), RadioOutputError);
 
@@ -104,7 +135,7 @@ assert.equal(healthResponse.status, 200);
 assert.equal(healthResponse.headers.get('cache-control'), 'no-store');
 const health = await healthResponse.json();
 assert.deepEqual(health.models, ['deepseek-v4-flash', 'deepseek-v4-pro']);
-assert.deepEqual(health.musicProviders, ['supabase-storage', 'youtube-playlist']);
+assert.deepEqual(health.musicProviders, ['supabase-storage', 'youtube-playlist', 'netease-local-companion']);
 
 const configResponse = await radioWorker.fetch(
   new Request('https://future.example/api/runtime-config.js'),
