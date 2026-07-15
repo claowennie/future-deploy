@@ -528,6 +528,7 @@ function RadioView() {
   const [companionPlayerState, setCompanionPlayerState] = _us(null);
   const [companionBusy, setCompanionBusy] = _us(false);
   const [companionPlaylist, setCompanionPlaylist] = _us([]);
+  const [companionAnnouncingIndex, setCompanionAnnouncingIndex] = _us(-1);
   const [companionSeeking, setCompanionSeeking] = _us(false);
   const [companionSeekDraft, setCompanionSeekDraft] = _us(0);
   const langRef = _ur(lang);
@@ -542,6 +543,12 @@ function RadioView() {
   const companionPlanReadyRef = _ur(false);
   const companionAnnouncementTokenRef = _ur(0);
   const companionAdvancingRef = _ur(false);
+  const companionAnnouncingIndexRef = _ur(-1);
+  const companionControlTokenRef = _ur(0);
+  const companionControlPendingRef = _ur(false);
+  const companionControlPromiseRef = _ur(Promise.resolve());
+  const companionPreparationPromiseRef = _ur(Promise.resolve());
+  const companionPlayingRef = _ur(false);
   const [youtubeReady, setYoutubeReady] = _us(false);
   const [youtubePlaying, setYoutubePlaying] = _us(false);
 
@@ -577,13 +584,19 @@ function RadioView() {
     const title = track?.name || state?.title || '';
     if (state) {
       setCompanionPlayerState(state);
+      companionPlayingRef.current = state.status === 'playing';
       setPlaying(state.status === 'playing');
+      if (state.status === 'playing') {
+        companionAnnouncingIndexRef.current = -1;
+        setCompanionAnnouncingIndex(-1);
+      }
     } else if (track) {
       setCompanionPlayerState((current) => ({
         ...(current || {}), status: 'playing', title, artist, position: 0, duration: 0,
         currentIndex: ['search_and_play', 'play_daily'].includes(action) ? 0 : current?.currentIndex,
       }));
       setPlaying(true);
+      companionPlayingRef.current = true;
     }
     if (title) {
       setNow((current) => ({
@@ -624,7 +637,8 @@ function RadioView() {
     const sync = async () => {
       try {
         const result = await getCompanionState({ url: companionUrl, token: companionToken });
-        if (alive) applyCompanionPlayback(result);
+        if (alive && !companionControlPendingRef.current
+          && companionAnnouncingIndexRef.current < 0) applyCompanionPlayback(result);
       } catch { /* keep the last visible state during a transient local error */ }
       if (alive) timer = window.setTimeout(sync, 700);
     };
@@ -664,6 +678,10 @@ function RadioView() {
         announcedCompanionIndexesRef.current = new Set();
         endingCompanionIndexesRef.current = new Set();
         companionAdvancingRef.current = false;
+        companionAnnouncingIndexRef.current = -1;
+        companionControlTokenRef.current += 1;
+        companionControlPendingRef.current = false;
+        setCompanionAnnouncingIndex(-1);
         setCompanionPlaylist([]);
       }
     });
@@ -743,12 +761,43 @@ function RadioView() {
     announcedCompanionIndexesRef.current = new Set();
     endingCompanionIndexesRef.current = new Set();
     companionAdvancingRef.current = false;
+    companionAnnouncingIndexRef.current = -1;
+    companionControlTokenRef.current += 1;
+    companionControlPendingRef.current = false;
+    setCompanionAnnouncingIndex(-1);
     setCompanionPlaylist([]);
+  };
+
+  const setCompanionAnnouncement = (index) => {
+    const next = Number.isInteger(index) ? index : -1;
+    companionAnnouncingIndexRef.current = next;
+    setCompanionAnnouncingIndex(next);
+  };
+
+  const previewCompanionTrack = (target, index, length = companionPlaylist.length) => {
+    if (!target) return;
+    const playbackIndex = Number.isInteger(target.playbackIndex) ? target.playbackIndex : index;
+    const title = target.title || target.query || '';
+    const artist = target.artist || '';
+    setCompanionAnnouncement(index);
+    companionPlayingRef.current = false;
+    setPlaying(false);
+    setCompanionPlayerState((current) => ({
+      ...(current || {}),
+      status: 'paused', title, artist, position: 0, duration: 0,
+      currentIndex: playbackIndex, queueLength: length,
+    }));
+    setNow({
+      id: `companion:${title}:${artist}`,
+      source: 'companion', title, artist,
+    });
   };
 
   const executeCompanionAction = async (action, query = '', queries = [], options = {}) => {
     if (companionStatus !== 'online') throw new Error('本机桥尚未连接，请先在设置里测试连接');
-    setCompanionBusy(true); setErr('');
+    const blocksUi = options.blockUi ?? ['search_and_play', 'play_daily'].includes(action);
+    if (blocksUi) setCompanionBusy(true);
+    setErr('');
     try {
       const result = await sendCompanionCommand(
         { url: companionUrl, token: companionToken }, action, query, queries, options,
@@ -759,10 +808,13 @@ function RadioView() {
       if (/配对码|401|没有连上/.test(error.message)) setCompanionStatus('offline');
       setErr(error.message);
       throw error;
-    } finally { setCompanionBusy(false); }
+    } finally {
+      if (blocksUi) setCompanionBusy(false);
+    }
   };
 
   const setOptimisticCompanionPlaying = (nextPlaying) => {
+    companionPlayingRef.current = nextPlaying;
     setPlaying(nextPlaying);
     setCompanionPlayerState((current) => current ? ({
       ...current,
@@ -770,11 +822,84 @@ function RadioView() {
     }) : current);
   };
 
-  const toggleCompanionPlayback = () => {
-    const wasPlaying = playing;
-    const action = wasPlaying ? 'pause' : 'resume';
+  const toggleCompanionPlayback = async () => {
+    const wasPlaying = companionPlayingRef.current;
+    const announcingIndex = companionAnnouncingIndexRef.current;
+    const target = companionPlaylist[announcingIndex];
+    const playbackIndex = Number.isInteger(target?.playbackIndex)
+      ? target.playbackIndex : announcingIndex;
+    const action = wasPlaying ? 'pause' : announcingIndex >= 0 ? 'play_index' : 'resume';
+    const options = action === 'play_index' ? { index: playbackIndex } : {};
+    const announcementToken = announcingIndex >= 0
+      ? ++companionAnnouncementTokenRef.current : companionAnnouncementTokenRef.current;
+    if (announcingIndex >= 0) {
+      try { speechSynthesis.cancel(); } catch { /* speech may be unavailable */ }
+      setCompanionAnnouncement(-1);
+    }
+    const token = ++companionControlTokenRef.current;
+    companionControlPendingRef.current = true;
     setOptimisticCompanionPlaying(!wasPlaying);
-    executeCompanionAction(action).catch(() => setOptimisticCompanionPlaying(wasPlaying));
+    setErr('');
+    try {
+      const command = companionControlPromiseRef.current.catch(() => {}).then(async () => {
+        if (announcingIndex >= 0) await companionPreparationPromiseRef.current.catch(() => {});
+        if (token !== companionControlTokenRef.current
+          || announcementToken !== companionAnnouncementTokenRef.current) return null;
+        return sendCompanionCommand(
+          { url: companionUrl, token: companionToken }, action, '', [], options,
+        );
+      });
+      companionControlPromiseRef.current = command;
+      const result = await command;
+      if (result && token === companionControlTokenRef.current) applyCompanionPlayback(result);
+    } catch (error) {
+      if (token === companionControlTokenRef.current) {
+        setOptimisticCompanionPlaying(wasPlaying);
+        setErr(error.message);
+      }
+    } finally {
+      if (token === companionControlTokenRef.current) companionControlPendingRef.current = false;
+    }
+  };
+
+  const introduceAndPlayCompanion = async (index, { resetEnding = true } = {}) => {
+    const target = companionPlaylist[index];
+    if (!target || companionStatus !== 'online') return null;
+    const playbackIndex = Number.isInteger(target.playbackIndex) ? target.playbackIndex : index;
+    const intro = target.intro || (langRef.current === 'en'
+      ? `Let’s switch to ${target.title || target.query}.`
+      : `接下来换到 ${target.title || target.query}。`);
+    const token = ++companionAnnouncementTokenRef.current;
+    companionControlTokenRef.current += 1;
+    companionControlPendingRef.current = false;
+    if (resetEnding) endingCompanionIndexesRef.current = new Set();
+    announcedCompanionIndexesRef.current.add(index);
+    previewCompanionTrack(target, index);
+    setErr('');
+    try {
+      const config = { url: companionUrl, token: companionToken };
+      const preparation = companionPreparationPromiseRef.current.catch(() => {}).then(async () => {
+        await companionControlPromiseRef.current.catch(() => {});
+        return sendCompanionCommand(config, 'prepare_index', '', [], { index: playbackIndex });
+      });
+      companionPreparationPromiseRef.current = preparation;
+      const prepared = await preparation;
+      if (token !== companionAnnouncementTokenRef.current) return null;
+      applyCompanionPlayback(prepared);
+      setLog((items) => [...items, { role: 'melo', text: intro, kind: 'intro' }]);
+      await speak(intro);
+      if (token !== companionAnnouncementTokenRef.current) return null;
+      const result = await sendCompanionCommand(config, 'play_index', '', [], { index: playbackIndex });
+      if (token !== companionAnnouncementTokenRef.current) return null;
+      applyCompanionPlayback(result);
+      return result;
+    } catch (error) {
+      if (token === companionAnnouncementTokenRef.current) {
+        setCompanionAnnouncement(-1);
+        setErr(error.message);
+      }
+      return null;
+    }
   };
 
   _ue(() => {
@@ -797,26 +922,8 @@ function RadioView() {
 
     companionAdvancingRef.current = true;
     endingCompanionIndexesRef.current.delete(currentIndex);
-    const token = companionAnnouncementTokenRef.current;
-    setCompanionBusy(true);
-    (async () => {
-      try {
-        const config = { url: companionUrl, token: companionToken };
-        if (target.intro && !announcedCompanionIndexesRef.current.has(targetIndex)) {
-          announcedCompanionIndexesRef.current.add(targetIndex);
-          setLog((items) => [...items, { role: 'melo', text: target.intro, kind: 'intro' }]);
-          await speak(target.intro);
-        }
-        if (token !== companionAnnouncementTokenRef.current) return;
-        const advanced = await sendCompanionCommand(config, 'next');
-        applyCompanionPlayback(advanced);
-      } catch (error) {
-        if (token === companionAnnouncementTokenRef.current) setErr(error.message);
-      } finally {
-        companionAdvancingRef.current = false;
-        if (token === companionAnnouncementTokenRef.current) setCompanionBusy(false);
-      }
-    })();
+    introduceAndPlayCompanion(targetIndex, { resetEnding: false })
+      .finally(() => { companionAdvancingRef.current = false; });
   }, [companionPlayerState?.status, companionPlayerState?.queueLength,
     companionActiveIndex, companionPlaylist]);
 
@@ -824,49 +931,20 @@ function RadioView() {
     const currentIndex = companionActiveIndex;
     const targetIndex = action === 'next' ? currentIndex + 1 : currentIndex - 1;
     const target = companionPlaylist[targetIndex];
-    if (!target?.intro || targetIndex < 0 || announcedCompanionIndexesRef.current.has(targetIndex)) {
+    if (!target || targetIndex < 0) {
       endingCompanionIndexesRef.current.delete(targetIndex);
       return executeCompanionAction(action);
     }
-    announcedCompanionIndexesRef.current.add(targetIndex);
     endingCompanionIndexesRef.current.delete(targetIndex);
-    await executeCompanionAction('pause');
-    setLog((items) => [...items, { role: 'melo', text: target.intro, kind: 'intro' }]);
-    await speak(target.intro);
-    return executeCompanionAction(action);
+    companionAdvancingRef.current = false;
+    return introduceAndPlayCompanion(targetIndex);
   };
 
   const playCompanionRecommendation = async (index) => {
     const target = companionPlaylist[index];
-    if (!target || companionStatus !== 'online' || companionBusy) return;
-    const playbackIndex = Number.isInteger(target.playbackIndex) ? target.playbackIndex : index;
-    const intro = target.intro || (langRef.current === 'en'
-      ? `Let’s switch to ${target.title || target.query}.`
-      : `接下来换到 ${target.title || target.query}。`);
-    const token = ++companionAnnouncementTokenRef.current;
+    if (!target || companionStatus !== 'online') return;
     companionAdvancingRef.current = false;
-    endingCompanionIndexesRef.current = new Set();
-    announcedCompanionIndexesRef.current.add(index);
-    setCompanionBusy(true);
-    setOptimisticCompanionPlaying(false);
-    setErr('');
-    try {
-      const config = { url: companionUrl, token: companionToken };
-      try {
-        const paused = await sendCompanionCommand(config, 'pause');
-        applyCompanionPlayback(paused);
-      } catch { /* A stopped player can still start the selected recommendation. */ }
-      if (token !== companionAnnouncementTokenRef.current) return;
-      setLog((items) => [...items, { role: 'melo', text: intro, kind: 'intro' }]);
-      await speak(intro);
-      if (token !== companionAnnouncementTokenRef.current) return;
-      const result = await sendCompanionCommand(config, 'play_index', '', [], { index: playbackIndex });
-      applyCompanionPlayback(result);
-    } catch (error) {
-      if (token === companionAnnouncementTokenRef.current) setErr(error.message);
-    } finally {
-      if (token === companionAnnouncementTokenRef.current) setCompanionBusy(false);
-    }
+    return introduceAndPlayCompanion(index);
   };
 
   const commitCompanionSeek = async (value) => {
@@ -913,6 +991,9 @@ function RadioView() {
     announcedCompanionIndexesRef.current = new Set();
     endingCompanionIndexesRef.current = new Set();
     companionAdvancingRef.current = false;
+    companionAnnouncingIndexRef.current = -1;
+    companionPreparationPromiseRef.current = Promise.resolve();
+    setCompanionAnnouncingIndex(-1);
     setCompanionPlaylist([]);
   };
 
@@ -951,12 +1032,10 @@ function RadioView() {
         const targetIndex = directIntent.action === 'next' ? currentIndex + 1
           : directIntent.action === 'previous' ? currentIndex - 1 : -1;
         const target = companionPlaylist[targetIndex];
-        if (target?.intro && targetIndex >= 0) {
-          announcedCompanionIndexesRef.current.add(targetIndex);
-          endingCompanionIndexesRef.current.delete(targetIndex);
-          await executeCompanionAction('pause');
-          setLog((items) => [...items, { role: 'melo', text: target.intro, kind: 'intro' }]);
-          await speak(target.intro);
+        let handledStep = false;
+        if (target && targetIndex >= 0) {
+          handledStep = true;
+          await introduceAndPlayCompanion(targetIndex);
         } else {
           await speak(directIntent.reply);
         }
@@ -964,11 +1043,13 @@ function RadioView() {
           clearCompanionRecommendation();
         }
         if (directIntent.action === 'stop') clearCompanionRecommendation();
-        await executeCompanionAction(
-          directIntent.action,
-          directIntent.query || '',
-          directIntent.queries || [],
-        );
+        if (!handledStep) {
+          await executeCompanionAction(
+            directIntent.action,
+            directIntent.query || '',
+            directIntent.queries || [],
+          );
+        }
       } catch { /* executeCompanionAction already exposes the error */ }
       finally { setThinking(false); }
       return;
@@ -1003,25 +1084,43 @@ function RadioView() {
         if (data.companionAction === 'search_and_play') {
           const plan = normalizeCompanionPlaylist(data.companionPlaylist, data.companionQueries);
           companionPlanReadyRef.current = false;
-          companionAnnouncementTokenRef.current += 1;
-          announcedCompanionIndexesRef.current = new Set(plan.length ? [0] : []);
+          const token = ++companionAnnouncementTokenRef.current;
+          announcedCompanionIndexesRef.current = new Set();
           endingCompanionIndexesRef.current = new Set();
           companionAdvancingRef.current = false;
-          setCompanionPlaylist(plan);
-          const firstIntro = plan[0]?.intro || data.say;
-          if (firstIntro) {
-            setLog((items) => [...items, { role: 'melo', text: firstIntro, kind: 'intro' }]);
-            setCompanionBusy(true);
-            await speak(firstIntro);
-          }
+          setCompanionAnnouncement(-1);
+          setCompanionPlaylist([]);
           const result = await executeCompanionAction(
             data.companionAction,
             plan[0]?.query || data.companionQuery,
             plan.map((item) => item.query),
-            { selections: plan.map(({ title, artist, query }) => ({ title, artist, query })) },
+            {
+              selections: plan.map(({ title, artist, query }) => ({ title, artist, query })),
+              deferPlayback: true,
+            },
           );
-          setCompanionPlaylist(mergeResolvedCompanionPlaylist(plan, result?.tracks));
+          if (token !== companionAnnouncementTokenRef.current) return;
+          const resolved = mergeResolvedCompanionPlaylist(plan, result?.tracks);
+          const first = resolved[0];
+          setCompanionPlaylist(resolved);
           companionPlanReadyRef.current = true;
+          companionPreparationPromiseRef.current = Promise.resolve(result);
+          if (first) {
+            announcedCompanionIndexesRef.current = new Set([0]);
+            previewCompanionTrack(first, 0, resolved.length);
+            const firstIntro = first.intro || data.say;
+            if (firstIntro) {
+              setLog((items) => [...items, { role: 'melo', text: firstIntro, kind: 'intro' }]);
+              await speak(firstIntro);
+            }
+            if (token !== companionAnnouncementTokenRef.current) return;
+            const playbackIndex = Number.isInteger(first.playbackIndex) ? first.playbackIndex : 0;
+            const playingResult = await sendCompanionCommand(
+              { url: companionUrl, token: companionToken },
+              'play_index', '', [], { index: playbackIndex },
+            );
+            if (token === companionAnnouncementTokenRef.current) applyCompanionPlayback(playingResult);
+          }
         } else {
           await speak(data.say);
           await executeCompanionAction(
@@ -1042,7 +1141,11 @@ function RadioView() {
         if (resumeMusic) musicRef.current?.play().catch(() => {});
         else if (resumeYouTube) executeYouTubeAction('play');
       }
-    } catch (error) { setThinking(false); setErr(error.message); }
+    } catch (error) {
+      setThinking(false);
+      setCompanionAnnouncement(-1);
+      setErr(error.message);
+    }
   };
 
   const status = !user ? 'signin' : !apiKey ? 'config' : workerStatus;
@@ -1111,7 +1214,9 @@ function RadioView() {
             </div>
             <div className="radio-now-meta">
               <div className="radio-now-kicker">
-                {now.source === 'companion' ? 'NETEASE · ' : ''}{playing ? 'NOW PLAYING' : 'PAUSED'}
+                {now.source === 'companion' ? 'NETEASE · ' : ''}{companionAnnouncingIndex >= 0
+                  ? (lang === 'en' ? 'MELO INTRO' : 'MELO 串词')
+                  : playing ? 'NOW PLAYING' : 'PAUSED'}
               </div>
               <div className="radio-now-title">{now.title || '未知曲目'}</div>
               <div className="radio-now-artist">{now.artist || ''}</div>
@@ -1137,7 +1242,7 @@ function RadioView() {
                       commitCompanionSeek(event.currentTarget.value).catch(() => {});
                     }
                   }}
-                  disabled={companionBusy || !(Number(companionPlayerState?.duration) > 0)} />
+                  disabled={!(Number(companionPlayerState?.duration) > 0)} />
                 <div className="radio-player-time">
                   <span>{formatPlayerTime(companionPosition)}</span>
                   <span>{formatPlayerTime(companionPlayerState?.duration)}</span>
@@ -1145,18 +1250,18 @@ function RadioView() {
                 <div className="radio-player-controls" aria-label="网易云播放控制">
                   <button type="button" aria-label="上一首" title="上一首"
                     onClick={() => stepCompanionWithIntro('previous').catch(() => {})}
-                    disabled={companionBusy || companionStatus !== 'online'}>‹</button>
+                    disabled={companionStatus !== 'online'}>‹</button>
                   <button type="button" className="radio-player-main"
                     aria-label={playing ? '暂停' : '继续'} title={playing ? '暂停' : '继续'}
                     onClick={toggleCompanionPlayback}
-                    disabled={companionBusy || companionStatus !== 'online'}>
+                    disabled={companionStatus !== 'online'}>
                     {playing
                       ? <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
                       : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2a1.1 1.1 0 0 0 0-1.8L9.6 4.9c-.7-.4-1.6.1-1.6.9Z" /></svg>}
                   </button>
                   <button type="button" aria-label="下一首" title="下一首"
                     onClick={() => stepCompanionWithIntro('next').catch(() => {})}
-                    disabled={companionBusy || companionStatus !== 'online'}>›</button>
+                    disabled={companionStatus !== 'online'}>›</button>
                 </div>
               </>}
               {now.unresolved && <div className="radio-warn">无法取得这首歌的临时播放链接，已跳过。</div>}
@@ -1196,7 +1301,7 @@ function RadioView() {
               onClick={() => (recommendationIsCompanion
                 ? playCompanionRecommendation(index)
                 : playAt(index))}
-              disabled={recommendationIsCompanion && (companionBusy || companionStatus !== 'online')}>
+              disabled={recommendationIsCompanion && companionStatus !== 'online'}>
               <div className="radio-recommendation-index">{active ? 'NOW' : String(index + 1).padStart(2, '0')}</div>
               <div className="radio-recommendation-copy">
                 <div className="radio-recommendation-track">

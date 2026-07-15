@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {
   normalizeModel, RadioOutputError, validateRadioPayload, validateTastePayload,
 } from '../worker/deepseek.js';
-import { buildRadioPrompt } from '../worker/radio-prompt.js';
+import { buildRadioPrompt, filterRecentCompanionPlaylist } from '../worker/radio-prompt.js';
 import radioWorker from '../worker/index.js';
 import { parseYouTubePlaylistUrl } from '../src/radio-client.js';
 import { isCompanionTrackNearEnd } from '../src/companion-client.js';
@@ -54,6 +54,16 @@ assert.match(prompt, /OUTPUT LANGUAGE IS ENGLISH/);
 assert.match(prompt, /9-10 条具体/);
 assert.doesNotMatch(prompt, /Claudio/);
 assert.doesNotMatch(prompt, /storage_path|user\/track-a\.mp3/);
+
+const varied = filterRecentCompanionPlaylist([
+  { title: 'Healing', artist: 'In Love With A Ghost', query: 'Healing In Love With A Ghost' },
+  { title: 'A Walk', artist: 'Tycho', query: 'A Walk Tycho' },
+], [
+  { title: 'healing, in love with a ghost!', artist: '' },
+]);
+assert.deepEqual(varied, [
+  { title: 'A Walk', artist: 'Tycho', query: 'A Walk Tycho' },
+]);
 
 const result = validateRadioPayload({
   reply: 'Let us slow things down.',
@@ -131,6 +141,8 @@ assert.match(companionPrompt, /网易云本机桥/);
 assert.match(companionPrompt, /search_and_play/);
 assert.match(companionPrompt, /title 与 artist 分开/);
 assert.match(companionPrompt, /宁可跳过/);
+assert.match(companionPrompt, /硬性排除清单/);
+assert.match(companionPrompt, /同一位歌手在整组中最多出现 1 首/);
 assert.deepEqual(validateRadioPayload({
   reply: '好，我去网易云找两首适合现在的。',
   playlistAction: 'none',

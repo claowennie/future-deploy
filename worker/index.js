@@ -1,7 +1,7 @@
 import {
   analyzeTaste, askDeepSeek, DeepSeekError, normalizeModel, testDeepSeekKey,
 } from './deepseek.js';
-import { buildRadioPrompt } from './radio-prompt.js';
+import { buildRadioPrompt, filterRecentCompanionPlaylist } from './radio-prompt.js';
 import {
   bearerToken,
   loadRadioContext,
@@ -142,9 +142,20 @@ async function handleApi(request, env, ctx) {
     hasExternalPlaylist,
     hasCompanion,
   });
-  const result = await askDeepSeek({
+  let result = await askDeepSeek({
     apiKey, model, prompt, candidates, hasExternalPlaylist, hasCompanion,
   });
+  if (result.companionAction === 'search_and_play' && result.companionPlaylist?.length) {
+    const fresh = filterRecentCompanionPlaylist(result.companionPlaylist, radio.plays);
+    if (fresh.length && fresh.length !== result.companionPlaylist.length) {
+      result = {
+        ...result,
+        companionPlaylist: fresh,
+        companionQueries: fresh.map((track) => track.query),
+        companionQuery: fresh[0].query,
+      };
+    }
+  }
 
   ctx.waitUntil(persistRadioTurn(env, token, user.id, text, result).catch(() => {}));
   return json({

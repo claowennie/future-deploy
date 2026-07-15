@@ -113,6 +113,7 @@ export function sendCompanionCommand(config, action, query = '', queries = [], o
       } : {}),
       ...(Number.isFinite(Number(options.position)) ? { position: Number(options.position) } : {}),
       ...(Number.isInteger(Number(options.index)) ? { index: Number(options.index) } : {}),
+      ...(options.deferPlayback === true ? { deferPlayback: true } : {}),
     },
   });
 }
