@@ -2,6 +2,7 @@ const COMPANION_URL_KEY = 'future_companion_url';
 const COMPANION_TOKEN_KEY = 'future_companion_token_session';
 
 export const DEFAULT_COMPANION_URL = 'http://127.0.0.1:45731';
+export const MAX_COMPANION_RECOMMENDATIONS = 8;
 
 export function isCompanionTrackNearEnd(state, thresholdSeconds = 12) {
   const position = Number(state?.position);
@@ -101,15 +102,17 @@ export function sendCompanionCommand(config, action, query = '', queries = [], o
       action,
       query: String(query || '').trim().slice(0, 120),
       queries: (Array.isArray(queries) ? queries : [])
-        .map((item) => String(item || '').trim().slice(0, 120)).filter(Boolean).slice(0, 5),
+        .map((item) => String(item || '').trim().slice(0, 120))
+        .filter(Boolean).slice(0, MAX_COMPANION_RECOMMENDATIONS),
       ...(Array.isArray(options.selections) ? {
-        selections: options.selections.slice(0, 5).map((item) => ({
+        selections: options.selections.slice(0, MAX_COMPANION_RECOMMENDATIONS).map((item) => ({
           title: String(item?.title || '').trim().slice(0, 160),
           artist: String(item?.artist || '').trim().slice(0, 220),
           query: String(item?.query || '').trim().slice(0, 120),
         })).filter((item) => item.title || item.query),
       } : {}),
       ...(Number.isFinite(Number(options.position)) ? { position: Number(options.position) } : {}),
+      ...(Number.isInteger(Number(options.index)) ? { index: Number(options.index) } : {}),
     },
   });
 }

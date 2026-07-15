@@ -4,6 +4,7 @@ const PLAYLIST_ACTIONS = new Set(['none', 'play', 'pause', 'next', 'previous', '
 const COMPANION_ACTIONS = new Set([
   'none', 'play_daily', 'search_and_play', 'pause', 'resume', 'stop', 'next', 'previous',
 ]);
+const MAX_COMPANION_RECOMMENDATIONS = 8;
 
 export class DeepSeekError extends Error {
   constructor(message, status = 502, code = 'deepseek_error') {
@@ -77,7 +78,7 @@ export function validateRadioPayload(payload, candidates = [], {
     throw new RadioOutputError('一次只能控制一个音乐来源');
   }
   const companionPlaylist = (Array.isArray(payload.companionPlaylist) ? payload.companionPlaylist : [])
-    .slice(0, 5)
+    .slice(0, MAX_COMPANION_RECOMMENDATIONS)
     .map((item) => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) {
         throw new RadioOutputError('companionPlaylist 项格式错误');
@@ -96,7 +97,8 @@ export function validateRadioPayload(payload, candidates = [], {
     throw new RadioOutputError('companionPlaylist 不能包含重复搜索词');
   }
   const companionQueries = (Array.isArray(payload.companionQueries) ? payload.companionQueries : [])
-    .map((item) => String(item || '').trim().slice(0, 120)).filter(Boolean).slice(0, 5);
+    .map((item) => String(item || '').trim().slice(0, 120)).filter(Boolean)
+    .slice(0, MAX_COMPANION_RECOMMENDATIONS);
   const legacyCompanionQuery = String(payload.companionQuery || '').trim().slice(0, 120);
   if (!companionQueries.length && legacyCompanionQuery) companionQueries.push(legacyCompanionQuery);
   if (companionPlaylist.length) companionQueries.splice(0, companionQueries.length, ...playlistQueries);

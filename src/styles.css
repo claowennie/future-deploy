@@ -3283,7 +3283,13 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   color: #fff;
   font-size: 13px;
 }
-.radio-player-controls button.radio-player-stop { margin-left: 3px; font-size: 10px; }
+.radio-player-controls button.radio-player-main svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: auto;
+  fill: currentColor;
+}
 .radio-player-controls button:disabled { opacity: .45; cursor: wait; }
 .radio-warn { font-size: 12px; color: var(--warm); margin-top: 6px; }
 .radio-now-empty {
@@ -3378,9 +3384,26 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
   gap: 10px;
+  width: 100%;
   padding: 11px 8px;
+  border: 0;
   border-bottom: 1px dashed color-mix(in srgb, var(--line) 72%, transparent);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+.radio-recommendation-item:hover:not(:disabled) {
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-soft) 38%, transparent);
+}
+.radio-recommendation-item:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 64%, transparent);
+  outline-offset: -2px;
+  border-radius: 10px;
+}
+.radio-recommendation-item:disabled { opacity: .58; cursor: wait; }
 .radio-recommendation-item:last-child { border-bottom: 0; }
 .radio-recommendation-item.active {
   margin: 2px 0;
@@ -3410,23 +3433,12 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   font-size: 14px;
   font-weight: 600;
 }
-.radio-recommendation-track > span,
-.radio-recommendation-track > button {
+.radio-recommendation-track > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.radio-recommendation-track > button {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  text-align: left;
-}
-.radio-recommendation-track > button:hover { color: var(--accent-ink); }
 .radio-recommendation-track small {
   flex: none;
   color: var(--ink-soft);

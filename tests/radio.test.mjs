@@ -50,6 +50,8 @@ assert.match(prompt, /Never say “我去网易云找”/);
 assert.match(prompt, /Taste is the identity baseline/);
 assert.match(prompt, /75-90%/);
 assert.match(prompt, /language of this website.*not evidence/);
+assert.match(prompt, /OUTPUT LANGUAGE IS ENGLISH/);
+assert.match(prompt, /7-8 条具体/);
 assert.doesNotMatch(prompt, /Claudio/);
 assert.doesNotMatch(prompt, /storage_path|user\/track-a\.mp3/);
 
@@ -102,6 +104,22 @@ assert.throws(() => validateRadioPayload({
   playlistAction: 'play',
   set: [],
 }, []), RadioOutputError);
+
+const expandedCompanionPlaylist = Array.from({ length: 8 }, (_, index) => ({
+  title: `Playable Song ${index + 1}`,
+  artist: `Original Artist ${index + 1}`,
+  query: `Playable Song ${index + 1} Original Artist ${index + 1}`,
+  intro: `这是第 ${index + 1} 首歌的独立串词。`,
+}));
+const expandedCompanionResult = validateRadioPayload({
+  reply: '我多准备几首，筛选后也能保持完整的一组。',
+  companionAction: 'search_and_play',
+  companionPlaylist: expandedCompanionPlaylist,
+  companionQueries: expandedCompanionPlaylist.map((track) => track.query),
+  set: [],
+}, [], { hasCompanion: true });
+assert.equal(expandedCompanionResult.companionPlaylist.length, 8);
+assert.equal(expandedCompanionResult.companionQueries.length, 8);
 
 const companionPrompt = buildRadioPrompt({
   text: '在网易云播放起风了',
