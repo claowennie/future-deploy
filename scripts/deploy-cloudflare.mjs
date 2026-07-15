@@ -19,10 +19,11 @@ const secretsFile = join(tmpdir(), `future-planner-secrets-${process.pid}.json`)
 await writeFile(secretsFile, JSON.stringify(secrets), { encoding: 'utf8', mode: 0o600 });
 
 try {
-  const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-  const child = spawn(command, ['wrangler', 'deploy', '--secrets-file', secretsFile], {
+  const child = spawn('npx', ['wrangler', 'deploy', '--secrets-file', secretsFile], {
     stdio: 'inherit',
-    shell: false,
+    // Node 24 on Windows cannot spawn .cmd shims directly with shell:false.
+    // All arguments here are fixed except our own random temp-file path.
+    shell: process.platform === 'win32',
   });
   const exitCode = await new Promise((resolve, reject) => {
     child.once('error', reject);
