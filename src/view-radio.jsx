@@ -252,7 +252,7 @@ function RadioSettings({
 
         <div className="radio-library-head">
           <div>
-            <div className="auth-label">方式 B · 网易云桌面桥（作品演示）</div>
+            <div className="auth-label">方式 B · 网易云桌面桥</div>
             <div className="radio-config-note">可选功能。音乐与登录凭证都留在你的电脑；网站只发送白名单播放指令。</div>
           </div>
           <span className={companionStatus === 'online' ? 'radio-source-ready' : ''}>
@@ -673,7 +673,7 @@ function RadioView() {
           <button onClick={() => executeCompanionAction('next').catch(() => {})}
             disabled={companionStatus !== 'online' || companionBusy}>下一首</button>
         </div>
-        <div className="radio-config-note">这是作品演示功能：网页只把结构化指令发到 127.0.0.1，网易云登录与真实播放都由你的电脑完成。</div>
+        <div className="radio-config-note">网页只把结构化指令发到 127.0.0.1，网易云登录与真实播放都由你的电脑完成。</div>
       </div>}
 
       {youtubePlaylistId && <div className="radio-external-player">
