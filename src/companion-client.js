@@ -2,7 +2,7 @@ const COMPANION_URL_KEY = 'future_companion_url';
 const COMPANION_TOKEN_KEY = 'future_companion_token_session';
 
 export const DEFAULT_COMPANION_URL = 'http://127.0.0.1:45731';
-export const MAX_COMPANION_RECOMMENDATIONS = 8;
+export const MAX_COMPANION_RECOMMENDATIONS = 10;
 
 export function isCompanionTrackNearEnd(state, thresholdSeconds = 12) {
   const position = Number(state?.position);

@@ -51,7 +51,7 @@ assert.match(prompt, /Taste is the identity baseline/);
 assert.match(prompt, /75-90%/);
 assert.match(prompt, /language of this website.*not evidence/);
 assert.match(prompt, /OUTPUT LANGUAGE IS ENGLISH/);
-assert.match(prompt, /7-8 条具体/);
+assert.match(prompt, /9-10 条具体/);
 assert.doesNotMatch(prompt, /Claudio/);
 assert.doesNotMatch(prompt, /storage_path|user\/track-a\.mp3/);
 
@@ -105,7 +105,7 @@ assert.throws(() => validateRadioPayload({
   set: [],
 }, []), RadioOutputError);
 
-const expandedCompanionPlaylist = Array.from({ length: 8 }, (_, index) => ({
+const expandedCompanionPlaylist = Array.from({ length: 10 }, (_, index) => ({
   title: `Playable Song ${index + 1}`,
   artist: `Original Artist ${index + 1}`,
   query: `Playable Song ${index + 1} Original Artist ${index + 1}`,
@@ -118,8 +118,8 @@ const expandedCompanionResult = validateRadioPayload({
   companionQueries: expandedCompanionPlaylist.map((track) => track.query),
   set: [],
 }, [], { hasCompanion: true });
-assert.equal(expandedCompanionResult.companionPlaylist.length, 8);
-assert.equal(expandedCompanionResult.companionQueries.length, 8);
+assert.equal(expandedCompanionResult.companionPlaylist.length, 10);
+assert.equal(expandedCompanionResult.companionQueries.length, 10);
 
 const companionPrompt = buildRadioPrompt({
   text: '在网易云播放起风了',

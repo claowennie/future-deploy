@@ -4,7 +4,7 @@ const PLAYLIST_ACTIONS = new Set(['none', 'play', 'pause', 'next', 'previous', '
 const COMPANION_ACTIONS = new Set([
   'none', 'play_daily', 'search_and_play', 'pause', 'resume', 'stop', 'next', 'previous',
 ]);
-const MAX_COMPANION_RECOMMENDATIONS = 8;
+const MAX_COMPANION_RECOMMENDATIONS = 10;
 
 export class DeepSeekError extends Error {
   constructor(message, status = 502, code = 'deepseek_error') {
