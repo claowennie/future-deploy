@@ -79,9 +79,18 @@ export function checkCompanion(config) {
   return companionRequest('/health', config);
 }
 
-export function sendCompanionCommand(config, action, query = '') {
+export function getCompanionState(config) {
+  return companionRequest('/state', config);
+}
+
+export function sendCompanionCommand(config, action, query = '', queries = []) {
   return companionRequest('/command', config, {
     method: 'POST',
-    body: { action, query: String(query || '').trim().slice(0, 120) },
+    body: {
+      action,
+      query: String(query || '').trim().slice(0, 120),
+      queries: (Array.isArray(queries) ? queries : [])
+        .map((item) => String(item || '').trim().slice(0, 120)).filter(Boolean).slice(0, 5),
+    },
   });
 }

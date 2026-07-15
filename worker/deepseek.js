@@ -67,9 +67,13 @@ export function validateRadioPayload(payload, candidates = [], {
   if (companionAction !== 'none' && (playlistAction !== 'none' || payload.set.length)) {
     throw new RadioOutputError('一次只能控制一个音乐来源');
   }
-  const companionQuery = String(payload.companionQuery || '').trim().slice(0, 120);
-  if (companionAction === 'search_and_play' && !companionQuery) {
-    throw new RadioOutputError('search_and_play 必须提供 companionQuery');
+  const companionQueries = (Array.isArray(payload.companionQueries) ? payload.companionQueries : [])
+    .map((item) => String(item || '').trim().slice(0, 120)).filter(Boolean).slice(0, 5);
+  const legacyCompanionQuery = String(payload.companionQuery || '').trim().slice(0, 120);
+  if (!companionQueries.length && legacyCompanionQuery) companionQueries.push(legacyCompanionQuery);
+  const companionQuery = companionQueries[0] || '';
+  if (companionAction === 'search_and_play' && !companionQueries.length) {
+    throw new RadioOutputError('search_and_play 必须提供 companionQueries');
   }
 
   const byId = new Map(candidates.map((track) => [String(track.id), track]));
@@ -94,7 +98,7 @@ export function validateRadioPayload(payload, candidates = [], {
     };
   });
 
-  return { reply, set, playlistAction, companionAction, companionQuery };
+  return { reply, set, playlistAction, companionAction, companionQuery, companionQueries };
 }
 
 function mapHttpError(status) {

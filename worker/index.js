@@ -147,6 +147,7 @@ async function handleApi(request, env, ctx) {
     playlistAction: result.playlistAction,
     companionAction: result.companionAction,
     companionQuery: result.companionQuery,
+    companionQueries: result.companionQueries,
     model,
   });
 }

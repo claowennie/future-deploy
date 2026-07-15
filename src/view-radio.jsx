@@ -17,6 +17,7 @@ import {
   clearCompanionConfig,
   DEFAULT_COMPANION_URL,
   getCompanionConfig,
+  getCompanionState,
   sendCompanionCommand,
   setCompanionConfig,
 } from './companion-client.js';
@@ -31,6 +32,31 @@ function hueFor(track) {
   let hash = 0;
   for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) & 0xffff;
   return hash % 360;
+}
+
+function formatPlayerTime(seconds) {
+  const value = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
+}
+
+function directCompanionIntent(value) {
+  const text = String(value || '').trim().replace(/[。！？!?]+$/, '');
+  if (!text) return null;
+  const compact = text.replace(/\s+/g, '').toLowerCase();
+  if (/^(下一首|切下一首|next)$/.test(compact)) return { action: 'next', reply: '好，切到下一首。' };
+  if (/^(上一首|切上一首|previous|prev)$/.test(compact)) return { action: 'previous', reply: '好，回到上一首。' };
+  if (/^(暂停|暂停播放|pause)$/.test(compact)) return { action: 'pause', reply: '先暂停一下。' };
+  if (/^(继续|继续播放|恢复播放|resume)$/.test(compact)) return { action: 'resume', reply: '继续播放。' };
+  if (/^(停止|停止播放|stop)$/.test(compact)) return { action: 'stop', reply: '已经停下来了。' };
+  if (/^(播放|放)(我的)?(每日推荐|今日推荐|日推)$/.test(compact)) {
+    return { action: 'play_daily', reply: '好，打开你的每日推荐。' };
+  }
+  const pointSong = text.match(/^(?:请)?(?:在)?网易云(?:里)?(?:播放|放)(?:一下)?\s*(.{1,100})$/i);
+  if (pointSong?.[1]) {
+    const query = pointSong[1].trim();
+    return { action: 'search_and_play', query, queries: [query], reply: `好，我去网易云找「${query}」。` };
+  }
+  return null;
 }
 
 function loadYouTubeIframeApi() {
@@ -326,7 +352,7 @@ function RadioView() {
   const [companionUrl, setCompanionUrl] = _us(() => getCompanionConfig().url);
   const [companionToken, setCompanionToken] = _us(() => getCompanionConfig().token);
   const [companionStatus, setCompanionStatus] = _us(() => getCompanionConfig().token ? 'checking' : 'disconnected');
-  const [companionActivity, setCompanionActivity] = _us('');
+  const [companionPlayerState, setCompanionPlayerState] = _us(null);
   const [companionBusy, setCompanionBusy] = _us(false);
   const musicRef = _ur(null);
   const youtubePlayerRef = _ur(null);
@@ -347,6 +373,28 @@ function RadioView() {
       localStorage.setItem('melo_lang', value);
       localStorage.removeItem('claudio_lang');
     } catch { /* ignore */ }
+  };
+
+  const applyCompanionPlayback = ({ state, track } = {}) => {
+    const artist = track?.artists?.filter(Boolean).join(' / ') || state?.artist || '';
+    const title = track?.name || state?.title || '';
+    if (state) {
+      setCompanionPlayerState(state);
+      setPlaying(state.status === 'playing');
+    } else if (track) {
+      setCompanionPlayerState((current) => ({
+        ...(current || {}), status: 'playing', title, artist, position: 0, duration: 0,
+      }));
+      setPlaying(true);
+    }
+    if (title) {
+      setNow((current) => ({
+        id: `companion:${title}:${artist}`,
+        source: 'companion',
+        title,
+        artist: artist || (current?.source === 'companion' ? current.artist : ''),
+      }));
+    }
   };
 
   const loadSettings = async () => {
@@ -370,6 +418,17 @@ function RadioView() {
       .catch(() => { if (alive) setWorkerStatus('offline'); });
     return () => { alive = false; };
   }, []);
+
+  _ue(() => {
+    if (companionStatus !== 'online' || !companionToken) return undefined;
+    let alive = true;
+    const sync = () => getCompanionState({ url: companionUrl, token: companionToken })
+      .then((result) => { if (alive) applyCompanionPlayback(result); })
+      .catch(() => {});
+    sync();
+    const timer = window.setInterval(sync, 4000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [companionStatus, companionUrl, companionToken]);
 
   _ue(() => {
     const config = getCompanionConfig();
@@ -454,6 +513,7 @@ function RadioView() {
       setCompanionToken(saved.token);
       const result = await checkCompanion(saved);
       setCompanionStatus('online');
+      getCompanionState(saved).then(applyCompanionPlayback).catch(() => {});
       return result;
     } catch (error) {
       setCompanionStatus('offline');
@@ -465,24 +525,17 @@ function RadioView() {
     clearCompanionConfig();
     setCompanionToken('');
     setCompanionStatus('disconnected');
-    setCompanionActivity('');
+    setCompanionPlayerState(null);
   };
 
-  const executeCompanionAction = async (action, query = '') => {
+  const executeCompanionAction = async (action, query = '', queries = []) => {
     if (companionStatus !== 'online') throw new Error('本机桥尚未连接，请先在设置里测试连接');
     setCompanionBusy(true); setErr('');
     try {
-      const result = await sendCompanionCommand({ url: companionUrl, token: companionToken }, action, query);
-      const track = result.track;
-      if (track?.name) {
-        const artist = Array.isArray(track.artists) ? track.artists.filter(Boolean).join(' / ') : '';
-        setCompanionActivity(`正在播放：${track.name}${artist ? ` · ${artist}` : ''}`);
-      } else {
-        const labels = {
-          pause: '已暂停', resume: '继续播放', stop: '已停止', next: '已切到下一首', previous: '已切到上一首',
-        };
-        setCompanionActivity(labels[action] || '指令已发送');
-      }
+      const result = await sendCompanionCommand(
+        { url: companionUrl, token: companionToken }, action, query, queries,
+      );
+      applyCompanionPlayback(result);
       return result;
     } catch (error) {
       if (/配对码|401|没有连上/.test(error.message)) setCompanionStatus('offline');
@@ -538,9 +591,32 @@ function RadioView() {
   const send = async (value) => {
     unlockAudio();
     if (!user) { window.dispatchEvent(new CustomEvent('future:open-auth')); return; }
-    if (!apiKey) { setSettingsOpen(true); return; }
     const message = String(value ?? input).trim();
-    setInput(''); setErr(''); setThinking(true);
+    const directIntent = companionStatus === 'online' ? directCompanionIntent(message) : null;
+    setInput(''); setErr('');
+
+    if (directIntent) {
+      setThinking(true);
+      setLog((items) => [
+        ...items,
+        { role: 'you', text: message },
+        { role: 'melo', text: directIntent.reply },
+      ]);
+      stopMusic(); pauseYouTube(); setQueue([]);
+      speak(directIntent.reply);
+      try {
+        await executeCompanionAction(
+          directIntent.action,
+          directIntent.query || '',
+          directIntent.queries || [],
+        );
+      } catch { /* executeCompanionAction already exposes the error */ }
+      finally { setThinking(false); }
+      return;
+    }
+
+    if (!apiKey) { setSettingsOpen(true); return; }
+    setThinking(true);
     setLog((items) => [...items, { role: 'you', text: message || '（随便放点）' }]);
     try {
       const data = await radioApi('/chat', {
@@ -563,9 +639,13 @@ function RadioView() {
         setQueue(playable); setIdx(0); stopMusic(); pauseYouTube();
         await speak(data.say); playAt(0, playable);
       } else if (data.companionAction && data.companionAction !== 'none' && companionStatus === 'online') {
-        stopMusic(); pauseYouTube(); setNow(null); setQueue([]);
-        await speak(data.say);
-        await executeCompanionAction(data.companionAction, data.companionQuery);
+        stopMusic(); pauseYouTube(); setQueue([]);
+        speak(data.say);
+        await executeCompanionAction(
+          data.companionAction,
+          data.companionQuery,
+          data.companionQueries || [],
+        );
       } else if (data.playlistAction && data.playlistAction !== 'none' && youtubePlaylistId) {
         stopMusic(); pauseYouTube(); setNow(null); setQueue([]);
         await speak(data.say);
@@ -620,6 +700,10 @@ function RadioView() {
             {status === 'connecting' && '连接中…'}
             {status === 'offline' && 'Worker 离线'}
           </div>
+          {companionToken && <div className={`radio-status radio-status-${companionStatus === 'online' ? 'online' : companionStatus}`}>
+            <span className="dot" />
+            {companionStatus === 'online' ? '本机已连接' : companionStatus === 'checking' ? '本机连接中…' : '本机未连接'}
+          </div>}
         </div>
       </div>
 
@@ -636,9 +720,37 @@ function RadioView() {
               <div className="radio-eq" aria-hidden="true"><span /><span /><span /><span /></div>
             </div>
             <div className="radio-now-meta">
-              <div className="radio-now-kicker">{playing ? 'NOW PLAYING' : 'PAUSED'}</div>
+              <div className="radio-now-kicker">
+                {now.source === 'companion' ? 'NETEASE · ' : ''}{playing ? 'NOW PLAYING' : 'PAUSED'}
+              </div>
               <div className="radio-now-title">{now.title || '未知曲目'}</div>
               <div className="radio-now-artist">{now.artist || ''}</div>
+              {now.source === 'companion' && <>
+                <div className="radio-player-progress" aria-label="播放进度">
+                  <i style={{ width: `${Math.min(100, Math.max(0,
+                    (Number(companionPlayerState?.position) || 0) / Math.max(1, Number(companionPlayerState?.duration) || 1) * 100,
+                  ))}%` }} />
+                </div>
+                <div className="radio-player-time">
+                  <span>{formatPlayerTime(companionPlayerState?.position)}</span>
+                  <span>{formatPlayerTime(companionPlayerState?.duration)}</span>
+                </div>
+                <div className="radio-player-controls" aria-label="网易云播放控制">
+                  <button type="button" aria-label="上一首" title="上一首"
+                    onClick={() => executeCompanionAction('previous').catch(() => {})}
+                    disabled={companionBusy || companionStatus !== 'online'}>‹</button>
+                  <button type="button" className="radio-player-main"
+                    aria-label={playing ? '暂停' : '继续'} title={playing ? '暂停' : '继续'}
+                    onClick={() => executeCompanionAction(playing ? 'pause' : 'resume').catch(() => {})}
+                    disabled={companionBusy || companionStatus !== 'online'}>{playing ? 'Ⅱ' : '▶'}</button>
+                  <button type="button" aria-label="下一首" title="下一首"
+                    onClick={() => executeCompanionAction('next').catch(() => {})}
+                    disabled={companionBusy || companionStatus !== 'online'}>›</button>
+                  <button type="button" className="radio-player-stop" aria-label="停止" title="停止"
+                    onClick={() => executeCompanionAction('stop').catch(() => {})}
+                    disabled={companionBusy || companionStatus !== 'online'}>■</button>
+                </div>
+              </>}
               {now.unresolved && <div className="radio-warn">无法取得这首歌的临时播放链接，已跳过。</div>}
             </div>
           </div>
@@ -649,32 +761,9 @@ function RadioView() {
               : '在设置里连接网易云桌面桥、导入 YouTube 歌单或上传自己的音乐，再让 Melo 开始播放。'
         }</div>}
         <audio ref={musicRef} controls onEnded={() => { setPlaying(false); if (idx + 1 < queue.length) playAt(idx + 1); }}
-          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} className="radio-audio" />
+          onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
+          className={now?.source === 'companion' ? 'radio-audio-hidden' : 'radio-audio'} />
       </div>
-
-      {companionToken && <div className={`radio-external-player radio-companion-player is-${companionStatus}`}>
-        <div className="radio-external-head">
-          <div>
-            <div className="radio-now-kicker">NETEASE LOCAL COMPANION</div>
-            <div className="radio-external-title">网易云桌面桥</div>
-          </div>
-          <span className="radio-companion-state">
-            {companionStatus === 'online' ? '本机已连接' : companionStatus === 'checking' ? '正在连接…' : '本机未连接'}
-          </span>
-        </div>
-        {companionActivity && <div className="radio-companion-activity">{companionActivity}</div>}
-        <div className="radio-companion-actions">
-          <button onClick={() => executeCompanionAction('play_daily').catch(() => {})}
-            disabled={companionStatus !== 'online' || companionBusy}>每日推荐</button>
-          <button onClick={() => executeCompanionAction('pause').catch(() => {})}
-            disabled={companionStatus !== 'online' || companionBusy}>暂停</button>
-          <button onClick={() => executeCompanionAction('resume').catch(() => {})}
-            disabled={companionStatus !== 'online' || companionBusy}>继续</button>
-          <button onClick={() => executeCompanionAction('next').catch(() => {})}
-            disabled={companionStatus !== 'online' || companionBusy}>下一首</button>
-        </div>
-        <div className="radio-config-note">网页只把结构化指令发到 127.0.0.1，网易云登录与真实播放都由你的电脑完成。</div>
-      </div>}
 
       {youtubePlaylistId && <div className="radio-external-player">
         <div className="radio-external-head">

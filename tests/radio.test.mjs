@@ -55,6 +55,7 @@ assert.deepEqual(result, {
   playlistAction: 'none',
   companionAction: 'none',
   companionQuery: '',
+  companionQueries: [],
 });
 
 const playlistPrompt = buildRadioPrompt({
@@ -77,6 +78,7 @@ assert.deepEqual(validateRadioPayload({
   playlistAction: 'shuffle',
   companionAction: 'none',
   companionQuery: '',
+  companionQueries: [],
 });
 assert.throws(() => validateRadioPayload({
   reply: 'No playlist.',
@@ -96,14 +98,16 @@ assert.deepEqual(validateRadioPayload({
   reply: '我让本机播放器去找这首歌。',
   playlistAction: 'none',
   companionAction: 'search_and_play',
-  companionQuery: '起风了',
+  companionQuery: '起风了 周深',
+  companionQueries: ['起风了 周深', '起风了 买辣椒也用券'],
   set: [],
 }, [], { hasCompanion: true }), {
   reply: '我让本机播放器去找这首歌。',
   set: [],
   playlistAction: 'none',
   companionAction: 'search_and_play',
-  companionQuery: '起风了',
+  companionQuery: '起风了 周深',
+  companionQueries: ['起风了 周深', '起风了 买辣椒也用券'],
 });
 assert.throws(() => validateRadioPayload({
   reply: 'No bridge.',
