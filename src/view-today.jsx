@@ -249,7 +249,7 @@ function Pomodoro() {
   const breakSec = state.pomoBreak || 300;
 
   // Wall-clock pomodoro, persisted across navigation. The Today view unmounts
-  // when you switch pages (e.g. to Claudio), which used to reset the countdown
+  // when you switch pages (e.g. to Melo), which used to reset the countdown
   // every time. We persist {mode, running, endAt, remaining} to localStorage and
   // derive the time left from a real timestamp (endAt) — so leaving and coming
   // back keeps the timer honest, and a phase that finished while you were away

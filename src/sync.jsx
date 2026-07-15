@@ -695,7 +695,7 @@ async function deleteAccount() {
   try {
     // 1) 笔记图片（私有桶 note-images/<user_id>/...）
     await clearPrivateStorageFolder('note-images', user.id);
-    // 2) Claudio 私有曲库（radio-audio/<user_id>/...）
+    // 2) Melo 私有曲库（radio-audio/<user_id>/...）
     await clearPrivateStorageFolder('radio-audio', user.id);
     // 3) 云端规划数据行；radio_* 表会在 auth 用户删除时级联清理
     await sbClient.from('planner_data').delete().eq('user_id', user.id);

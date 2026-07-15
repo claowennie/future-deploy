@@ -24,6 +24,8 @@ const prompt = buildRadioPrompt({
 });
 assert.match(prompt, /track-a/);
 assert.match(prompt, /Play something calm/);
+assert.match(prompt, /You are Melo/);
+assert.doesNotMatch(prompt, /Claudio/);
 assert.doesNotMatch(prompt, /storage_path|user\/track-a\.mp3/);
 
 const result = validateRadioPayload({

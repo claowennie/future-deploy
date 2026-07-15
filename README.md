@@ -1,6 +1,6 @@
 # Future Deploy
 
-`future-deploy` 是从自用版 `future.v2` 独立复制出的 Cloudflare 部署版。它保留原有 React/Vite 与 Supabase 同步功能，并把本机 Claudio 改造成可部署的 AI 电台：
+`future-deploy` 是从自用版 `future.v2` 独立复制出的 Cloudflare 部署版。它保留原有 React/Vite 与 Supabase 同步功能，并把原本依赖本机服务的电台改造成可部署的 Melo AI 电台：
 
 - Cloudflare Workers 同时托管前端静态文件和 `/api/radio/*` API
 - Supabase Auth 验证每个请求，数据库 RLS 隔离不同账号
@@ -79,7 +79,7 @@ npm run dev:worker
 npm run dev
 ```
 
-打开 `http://localhost:5173`。登录后进入 Claudio 设置，输入自己的 DeepSeek Key、保存偏好并上传音频。Key 在关闭标签页或退出登录后会清除。
+打开 `http://localhost:5173`。登录后进入 Melo 设置，输入自己的 DeepSeek Key、保存偏好并上传音频。Key 在关闭标签页或退出登录后会清除。
 
 ## 4. 部署到现有 Cloudflare Worker
 

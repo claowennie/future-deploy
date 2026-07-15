@@ -1,4 +1,4 @@
-// Cloudflare 部署版 Claudio：Supabase 账号隔离 + 用户自带 DeepSeek Key + 私有曲库。
+// Cloudflare 部署版 Melo：Supabase 账号隔离 + 用户自带 DeepSeek Key + 私有曲库。
 import React from 'react';
 import {
   clearDeepSeekKey,
@@ -100,7 +100,7 @@ function RadioSettings({
       <div className="auth-modal radio-settings-modal">
         <button className="auth-close" onClick={onClose} aria-label="关闭">×</button>
         <div className="auth-head">
-          <div className="auth-title serif">Claudio 电台设置</div>
+          <div className="auth-title serif">Melo 电台设置</div>
           <div className="auth-sub">每个账号使用自己的模型 Key 和私有曲库。</div>
         </div>
 
@@ -178,14 +178,17 @@ function RadioView() {
   const [now, setNow] = _us(null);
   const [playing, setPlaying] = _us(false);
   const [err, setErr] = _us('');
-  const [lang, setLang] = _us(() => localStorage.getItem('claudio_lang') || 'zh');
+  const [lang, setLang] = _us(() => localStorage.getItem('melo_lang') || localStorage.getItem('claudio_lang') || 'zh');
   const musicRef = _ur(null);
   const playTokenRef = _ur(0);
   const audioUnlockedRef = _ur(false);
 
   const setLangPersist = (value) => {
     setLang(value);
-    try { localStorage.setItem('claudio_lang', value); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('melo_lang', value);
+      localStorage.removeItem('claudio_lang');
+    } catch { /* ignore */ }
   };
 
   const loadSettings = async () => {
@@ -266,7 +269,7 @@ function RadioView() {
     if (!track) return;
     const token = ++playTokenRef.current;
     setIdx(index); setNow(track); stopMusic();
-    if (track.intro) setLog((items) => [...items, { role: 'claudio', text: track.intro }]);
+    if (track.intro) setLog((items) => [...items, { role: 'melo', text: track.intro }]);
     await speak(track.intro);
     if (token !== playTokenRef.current) return;
     if (track.url && musicRef.current) {
@@ -284,7 +287,7 @@ function RadioView() {
     setLog((items) => [...items, { role: 'you', text: message || '（随便放点）' }]);
     try {
       const data = await radioApi('/chat', { key: apiKey, body: { text: message, lang, model } });
-      setLog((items) => [...items, { role: 'claudio', text: data.say }]);
+      setLog((items) => [...items, { role: 'melo', text: data.say }]);
       const playable = await Promise.all((data.tracks || []).map(async (track) => {
         try { return { ...track, url: await signedTrackUrl(track) }; }
         catch { return { ...track, url: '', unresolved: true }; }
@@ -319,12 +322,12 @@ function RadioView() {
 
       <div className="hero">
         <div>
-          <div className="greeting"><span className="serif accent">Claudio</span> · 你的 AI 电台</div>
-          <div className="greeting-sub">DeepSeek 懂你的当下，私有曲库负责真正播放。</div>
+          <div className="greeting"><span className="serif accent">Melo</span> · 你的 AI 电台</div>
+          <div className="greeting-sub">懂你的当下，你的私人AI电台。</div>
         </div>
         <div className="radio-hero-right">
           <button className="radio-settings-btn" onClick={() => setSettingsOpen(true)}>设置</button>
-          <div className="radio-lang" role="group" aria-label="Claudio 语言">
+          <div className="radio-lang" role="group" aria-label="Melo 语言">
             <button className={`radio-lang-btn ${lang === 'zh' ? 'active' : ''}`} onClick={() => setLangPersist('zh')}>中</button>
             <button className={`radio-lang-btn ${lang === 'en' ? 'active' : ''}`} onClick={() => setLangPersist('en')}>EN</button>
           </div>
@@ -358,7 +361,7 @@ function RadioView() {
               {now.unresolved && <div className="radio-warn">无法取得这首歌的临时播放链接，已跳过。</div>}
             </div>
           </div>
-        ) : <div className="radio-now-empty">{tracks.length ? '跟 Claudio 说句话，开始一段只属于你的电台。' : '先在设置里上传几首自己的音乐，再让 Claudio 排一段。'}</div>}
+        ) : <div className="radio-now-empty">{tracks.length ? '跟 Melo 说句话，开始一段只属于你的电台。' : '先在设置里上传几首自己的音乐，再让 Melo 排一段。'}</div>}
         <audio ref={musicRef} controls onEnded={() => { setPlaying(false); if (idx + 1 < queue.length) playAt(idx + 1); }}
           onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} className="radio-audio" />
       </div>
@@ -374,9 +377,9 @@ function RadioView() {
 
       <div className="radio-log">
         {log.map((item, index) => <div key={index} className={`radio-bubble radio-bubble-${item.role}`}>
-          {item.role === 'claudio' && <span className="radio-dj-tag">DJ</span>}{item.text}
+          {item.role === 'melo' && <span className="radio-dj-tag">DJ</span>}{item.text}
         </div>)}
-        {thinking && <div className="radio-bubble radio-bubble-claudio radio-thinking">Claudio 正在想…</div>}
+        {thinking && <div className="radio-bubble radio-bubble-melo radio-thinking">Melo 正在想…</div>}
         {err && <div className="radio-err">{err}</div>}
       </div>
 
@@ -385,7 +388,7 @@ function RadioView() {
       <div className="radio-compose">
         <input value={input} onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => { if (event.key === 'Enter' && canSend) send(); }}
-          placeholder="跟 Claudio 说点什么…（想听什么 / 现在的心情）" disabled={!canSend} maxLength="1200" />
+          placeholder="跟 Melo 说点什么…（想听什么 / 现在的心情）" disabled={!canSend} maxLength="1200" />
         <button onClick={() => send()} disabled={!canSend}>播</button>
       </div>
     </div>

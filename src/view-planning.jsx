@@ -25,7 +25,7 @@ function PeriodNav({ offset, setOffset, prevTitle, nextTitle, resetLabel, nextDi
 // ===== 本周回顾卡片（纯统计版）=====
 // 本周：周日 18:00 起浮现（一周收尾的仪式）；翻看过去的周：只要那周有记录就显示。
 // 未来的周不显示（由调用方用 offset<=0 把关）。数据全来自本机 computeWeekStats，
-// 不依赖 Claudio —— 第一版的「纯统计版」，Claudio 在场时将来再升级成「周回顾电台」。
+// 不依赖 Melo —— 第一版的「纯统计版」，Melo 在场时将来再升级成「周回顾电台」。
 function WeekReview({ wStart, isCurrent }) {
   const { state } = useStore();
   const now = new Date();

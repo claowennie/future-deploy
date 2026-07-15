@@ -5,7 +5,7 @@
 //   · 其余同源 GET（JS/CSS/字体/图片/环境音）→ stale-while-revalidate：先回缓存
 //     秒开，后台再更新 —— Vite 的 hashed 文件名天然不会脏，public/assets 下
 //     无哈希的文件（树 PNG、mp3）最多旧一次刷新；
-//   · /api/（Claudio 中枢）、跨域（Supabase 等）、非 GET → 不碰。
+//   · /api/（Melo 中枢）、跨域（Supabase 等）、非 GET → 不碰。
 // 改 VERSION 可整体作废旧缓存（一般不需要：壳是网络优先，资源带哈希）。
 const VERSION = 'v1';
 const CACHE = `future-${VERSION}`;
@@ -65,7 +65,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== location.origin) return;       // Supabase / Sentry 等第三方不缓存
-  if (url.pathname.startsWith('/api/')) return;     // Claudio 中枢接口永远走网络
+  if (url.pathname.startsWith('/api/')) return;     // Melo 中枢接口永远走网络
 
   // 导航请求：网络优先，离线退回缓存的应用壳
   if (req.mode === 'navigate') {

@@ -1,6 +1,6 @@
 # Web Push 部署指南（future-deploy）
 
-Web Push 是可选功能，用于 App 关闭后发送习惯提醒和周回顾。本地通知与 Claudio 电台都不依赖它。
+Web Push 是可选功能，用于 App 关闭后发送习惯提醒和周回顾。本地通知与 Melo 电台都不依赖它。
 
 ## 1. 生成 VAPID 密钥
 

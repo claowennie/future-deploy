@@ -22,7 +22,7 @@ export const zh = {
   nav: {
     sectionPlanning: '规划 · Planning', sectionReflect: '记录 · Reflect', sectionSound: '声音 · Sound',
     today: '今日 · Today', week: '本周 · This Week', month: '本月 · Month', year: '年度 · Year',
-    journal: '成功日记 · Journal', notes: '随手笔记 · Notes', radio: '电台 · Claudio',
+    journal: '成功日记 · Journal', notes: '随手笔记 · Notes', radio: '电台 · Melo',
     recurring: '重复任务', recurringTitle: '管理重复任务',
     zen: '沉浸观赏 · 隐藏界面', zenTitle: '隐藏界面，只看背景成长树',
     collapse: '收起侧栏', expand: '展开侧栏',

@@ -11,7 +11,7 @@ function conversationSection(messages) {
   if (!Array.isArray(messages) || messages.length === 0) return '（暂无历史）';
   return messages
     .slice(-10)
-    .map((item) => `${item.role === 'user' ? 'TA' : 'Claudio'}：${clip(item.content, 500)}`)
+    .map((item) => `${item.role === 'user' ? 'TA' : 'Melo'}：${clip(item.content, 500)}`)
     .join('\n');
 }
 
@@ -47,7 +47,7 @@ export function buildRadioPrompt({
   const maxSet = Math.min(8, tracks.length);
   const preferredMin = tracks.length >= 5 ? 5 : Math.min(1, tracks.length);
 
-  return `You are Claudio — a private AI radio for one person. You are a warm, thoughtful friend, not a radio announcer.
+  return `You are Melo — a private AI radio for one person. You are a warm, thoughtful friend, not a radio announcer.
 
 How you talk:
 - Respond to what the person actually said before introducing music.

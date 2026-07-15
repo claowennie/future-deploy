@@ -7,7 +7,7 @@
 //    （包括非 React 的 modal 文案、通知文本）一次到位，不用给全工程穿 context。
 //  - node 单测会 import dates.js → 本模块：所有浏览器 API 都有 typeof 守卫，
 //    node 里语言固定 zh（测试断言的中文格式不受影响）。
-// 内容类数据（每日语录、反思提示、示例数据、Claudio 电台）不在 i18n 范围，保持中文。
+// 内容类数据（每日语录、反思提示、示例数据、Melo 电台）不在 i18n 范围，保持中文。
 import { zh } from './locales/zh.js';
 import { en } from './locales/en.js';
 

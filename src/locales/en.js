@@ -21,7 +21,7 @@ export const en = {
   nav: {
     sectionPlanning: 'Planning', sectionReflect: 'Reflect', sectionSound: 'Sound',
     today: 'Today', week: 'This Week', month: 'Month', year: 'Year',
-    journal: 'Journal', notes: 'Notes', radio: 'Radio · Claudio',
+    journal: 'Journal', notes: 'Notes', radio: 'Radio · Melo',
     recurring: 'Recurring', recurringTitle: 'Manage recurring tasks',
     zen: 'Zen mode · hide UI', zenTitle: 'Hide the UI and just watch the growth tree',
     collapse: 'Collapse sidebar', expand: 'Open sidebar',

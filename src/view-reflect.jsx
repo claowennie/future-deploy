@@ -257,7 +257,7 @@ function MomentCard({ note, onRemove, onEdit }) {
 function MomentComposer({ onSubmit, onCancel, initial, submitLabel, storageKey }) {
   if (submitLabel == null) submitLabel = t('notes.share');
   // 草稿恢复：优先用持久化草稿（storageKey），否则用传入的 initial（编辑已发布笔记时预填）。
-  // 这样在随手笔记里写到一半切去 Claudio 换歌、再切回来，内容不会丢。
+  // 这样在随手笔记里写到一半切去 Melo 换歌、再切回来，内容不会丢。
   const restoreDraft = () => {
     if (storageKey) {
       try { const raw = localStorage.getItem(storageKey); if (raw) return JSON.parse(raw); } catch {}
