@@ -103,8 +103,8 @@ export async function persistRadioTurn(env, token, userId, userText, result) {
       body: result.companionPlaylist.map((track) => ({
         user_id: userId,
         track_id: null,
-        artist: '',
-        title: track.query,
+        artist: track.artist,
+        title: track.title,
       })),
     }));
   }

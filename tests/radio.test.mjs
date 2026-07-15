@@ -143,6 +143,7 @@ assert.match(companionPrompt, /title 与 artist 分开/);
 assert.match(companionPrompt, /宁可跳过/);
 assert.match(companionPrompt, /硬性排除清单/);
 assert.match(companionPrompt, /同一位歌手在整组中最多出现 1 首/);
+assert.match(companionPrompt, /优先避开【最近播放过】里已经出现过的歌手/);
 assert.deepEqual(validateRadioPayload({
   reply: '好，我去网易云找两首适合现在的。',
   playlistAction: 'none',
