@@ -19,6 +19,7 @@ import {
   DEFAULT_COMPANION_URL,
   getCompanionConfig,
   getCompanionState,
+  isCompanionTrackNearEnd,
   sendCompanionCommand,
   setCompanionConfig,
 } from './companion-client.js';
@@ -520,7 +521,7 @@ function RadioView() {
   const playTokenRef = _ur(0);
   const audioUnlockedRef = _ur(false);
   const announcedCompanionIndexesRef = _ur(new Set());
-  const playedCompanionIndexesRef = _ur(new Set());
+  const endingCompanionIndexesRef = _ur(new Set());
   const companionPlanReadyRef = _ur(false);
   const companionAnnouncementTokenRef = _ur(0);
   const companionAdvancingRef = _ur(false);
@@ -631,7 +632,7 @@ function RadioView() {
         companionPlanReadyRef.current = false;
         companionAnnouncementTokenRef.current += 1;
         announcedCompanionIndexesRef.current = new Set();
-        playedCompanionIndexesRef.current = new Set();
+        endingCompanionIndexesRef.current = new Set();
         companionAdvancingRef.current = false;
         setCompanionPlaylist([]);
       }
@@ -709,7 +710,7 @@ function RadioView() {
     companionPlanReadyRef.current = false;
     companionAnnouncementTokenRef.current += 1;
     announcedCompanionIndexesRef.current = new Set();
-    playedCompanionIndexesRef.current = new Set();
+    endingCompanionIndexesRef.current = new Set();
     companionAdvancingRef.current = false;
     setCompanionPlaylist([]);
   };
@@ -732,10 +733,11 @@ function RadioView() {
 
   _ue(() => {
     const currentIndex = companionActiveIndex;
-    if (companionPlayerState?.status === 'playing' && currentIndex >= 0) {
-      playedCompanionIndexesRef.current.add(currentIndex);
+    if (currentIndex >= 0 && isCompanionTrackNearEnd(companionPlayerState)) {
+      endingCompanionIndexesRef.current.add(currentIndex);
     }
-  }, [companionPlayerState?.status, companionActiveIndex]);
+  }, [companionPlayerState?.status, companionPlayerState?.position,
+    companionPlayerState?.duration, companionActiveIndex]);
 
   _ue(() => {
     const currentIndex = companionActiveIndex;
@@ -744,10 +746,11 @@ function RadioView() {
     const plannedLength = Number(companionPlayerState?.queueLength) || 0;
     if (!companionPlanReadyRef.current || companionPlayerState?.status !== 'stopped'
       || !Number.isInteger(currentIndex) || currentIndex < 0 || !target
-      || plannedLength <= targetIndex || !playedCompanionIndexesRef.current.has(currentIndex)
+      || plannedLength <= targetIndex || !endingCompanionIndexesRef.current.has(currentIndex)
       || companionAdvancingRef.current) return;
 
     companionAdvancingRef.current = true;
+    endingCompanionIndexesRef.current.delete(currentIndex);
     const token = companionAnnouncementTokenRef.current;
     setCompanionBusy(true);
     (async () => {
@@ -776,9 +779,11 @@ function RadioView() {
     const targetIndex = action === 'next' ? currentIndex + 1 : currentIndex - 1;
     const target = companionPlaylist[targetIndex];
     if (!target?.intro || targetIndex < 0 || announcedCompanionIndexesRef.current.has(targetIndex)) {
+      endingCompanionIndexesRef.current.delete(targetIndex);
       return executeCompanionAction(action);
     }
     announcedCompanionIndexesRef.current.add(targetIndex);
+    endingCompanionIndexesRef.current.delete(targetIndex);
     await executeCompanionAction('pause');
     setLog((items) => [...items, { role: 'melo', text: target.intro, kind: 'intro' }]);
     await speak(target.intro);
@@ -827,7 +832,7 @@ function RadioView() {
     companionPlanReadyRef.current = false;
     companionAnnouncementTokenRef.current += 1;
     announcedCompanionIndexesRef.current = new Set();
-    playedCompanionIndexesRef.current = new Set();
+    endingCompanionIndexesRef.current = new Set();
     companionAdvancingRef.current = false;
     setCompanionPlaylist([]);
   };
@@ -868,6 +873,7 @@ function RadioView() {
         const target = companionPlaylist[targetIndex];
         if (target?.intro && targetIndex >= 0) {
           announcedCompanionIndexesRef.current.add(targetIndex);
+          endingCompanionIndexesRef.current.delete(targetIndex);
           await executeCompanionAction('pause');
           setLog((items) => [...items, { role: 'melo', text: target.intro, kind: 'intro' }]);
           await speak(target.intro);
@@ -877,6 +883,7 @@ function RadioView() {
         if (['play_daily', 'search_and_play'].includes(directIntent.action)) {
           clearCompanionRecommendation();
         }
+        if (directIntent.action === 'stop') clearCompanionRecommendation();
         await executeCompanionAction(
           directIntent.action,
           directIntent.query || '',
@@ -918,7 +925,7 @@ function RadioView() {
           companionPlanReadyRef.current = false;
           companionAnnouncementTokenRef.current += 1;
           announcedCompanionIndexesRef.current = new Set(plan.length ? [0] : []);
-          playedCompanionIndexesRef.current = new Set();
+          endingCompanionIndexesRef.current = new Set();
           companionAdvancingRef.current = false;
           setCompanionPlaylist(plan);
           const firstIntro = plan[0]?.intro || data.say;
@@ -1067,7 +1074,10 @@ function RadioView() {
                     onClick={() => stepCompanionWithIntro('next').catch(() => {})}
                     disabled={companionBusy || companionStatus !== 'online'}>›</button>
                   <button type="button" className="radio-player-stop" aria-label="停止" title="停止"
-                    onClick={() => executeCompanionAction('stop').catch(() => {})}
+                    onClick={() => {
+                      clearCompanionRecommendation();
+                      executeCompanionAction('stop').catch(() => {});
+                    }}
                     disabled={companionBusy || companionStatus !== 'online'}>■</button>
                 </div>
               </>}

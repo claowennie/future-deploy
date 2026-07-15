@@ -5,6 +5,7 @@ import {
 import { buildRadioPrompt } from '../worker/radio-prompt.js';
 import radioWorker from '../worker/index.js';
 import { parseYouTubePlaylistUrl } from '../src/radio-client.js';
+import { isCompanionTrackNearEnd } from '../src/companion-client.js';
 
 const candidates = [
   { id: 'track-a', artist: 'Artist A', title: 'Song A', storage_path: 'user/track-a.mp3' },
@@ -26,6 +27,11 @@ assert.deepEqual(parseYouTubePlaylistUrl('https://music.youtube.com/playlist?lis
 assert.equal(parseYouTubePlaylistUrl(''), null);
 assert.throws(() => parseYouTubePlaylistUrl('https://youtube.com.evil.example/playlist?list=PL1234567890abc'));
 assert.throws(() => parseYouTubePlaylistUrl('https://www.youtube.com/watch?v=abc'));
+
+assert.equal(isCompanionTrackNearEnd({ status: 'playing', position: 7, duration: 229 }), false);
+assert.equal(isCompanionTrackNearEnd({ status: 'playing', position: 220, duration: 229 }), true);
+assert.equal(isCompanionTrackNearEnd({ status: 'stopped', position: 229, duration: 229 }), false);
+assert.equal(isCompanionTrackNearEnd({ status: 'playing', position: 0, duration: 0 }), false);
 
 const prompt = buildRadioPrompt({
   text: 'Play something calm',

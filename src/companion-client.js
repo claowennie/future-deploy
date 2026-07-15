@@ -3,6 +3,17 @@ const COMPANION_TOKEN_KEY = 'future_companion_token_session';
 
 export const DEFAULT_COMPANION_URL = 'http://127.0.0.1:45731';
 
+export function isCompanionTrackNearEnd(state, thresholdSeconds = 12) {
+  const position = Number(state?.position);
+  const duration = Number(state?.duration);
+  const threshold = Math.max(1, Number(thresholdSeconds) || 12);
+  const remaining = duration - position;
+  return state?.status === 'playing'
+    && Number.isFinite(position) && Number.isFinite(duration)
+    && position > 0 && duration > 0
+    && remaining >= -2 && remaining <= threshold;
+}
+
 export function normalizeCompanionUrl(value) {
   const raw = String(value || '').trim() || DEFAULT_COMPANION_URL;
   let url;
