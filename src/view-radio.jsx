@@ -802,7 +802,7 @@ function RadioView() {
       const result = await sendCompanionCommand(
         { url: companionUrl, token: companionToken }, action, query, queries, options,
       );
-      applyCompanionPlayback(result);
+      if (options.applyResult !== false) applyCompanionPlayback(result);
       return result;
     } catch (error) {
       if (/配对码|401|没有连上/.test(error.message)) setCompanionStatus('offline');
@@ -1090,15 +1090,19 @@ function RadioView() {
           companionAdvancingRef.current = false;
           setCompanionAnnouncement(-1);
           setCompanionPlaylist([]);
-          const result = await executeCompanionAction(
+          const searchOutcome = executeCompanionAction(
             data.companionAction,
             plan[0]?.query || data.companionQuery,
             plan.map((item) => item.query),
             {
               selections: plan.map(({ title, artist, query }) => ({ title, artist, query })),
               deferPlayback: true,
+              applyResult: false,
             },
-          );
+          ).then((result) => ({ result, error: null }), (error) => ({ result: null, error }));
+          await speak(data.say);
+          const { result, error: searchError } = await searchOutcome;
+          if (searchError) throw searchError;
           if (token !== companionAnnouncementTokenRef.current) return;
           const resolved = mergeResolvedCompanionPlaylist(plan, result?.tracks);
           const first = resolved[0];
@@ -1108,7 +1112,9 @@ function RadioView() {
           if (first) {
             announcedCompanionIndexesRef.current = new Set([0]);
             previewCompanionTrack(first, 0, resolved.length);
-            const firstIntro = first.intro || data.say;
+            const firstIntro = first.intro || (langRef.current === 'en'
+              ? `Let’s begin with ${first.title || first.query}.`
+              : `先从 ${first.title || first.query} 开始。`);
             if (firstIntro) {
               setLog((items) => [...items, { role: 'melo', text: firstIntro, kind: 'intro' }]);
               await speak(firstIntro);
