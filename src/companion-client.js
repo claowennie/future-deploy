@@ -83,7 +83,7 @@ export function getCompanionState(config) {
   return companionRequest('/state', config);
 }
 
-export function sendCompanionCommand(config, action, query = '', queries = []) {
+export function sendCompanionCommand(config, action, query = '', queries = [], options = {}) {
   return companionRequest('/command', config, {
     method: 'POST',
     body: {
@@ -91,6 +91,7 @@ export function sendCompanionCommand(config, action, query = '', queries = []) {
       query: String(query || '').trim().slice(0, 120),
       queries: (Array.isArray(queries) ? queries : [])
         .map((item) => String(item || '').trim().slice(0, 120)).filter(Boolean).slice(0, 5),
+      ...(Number.isFinite(Number(options.position)) ? { position: Number(options.position) } : {}),
     },
   });
 }

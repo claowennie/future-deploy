@@ -1,4 +1,6 @@
-import { askDeepSeek, DeepSeekError, normalizeModel, testDeepSeekKey } from './deepseek.js';
+import {
+  analyzeTaste, askDeepSeek, DeepSeekError, normalizeModel, testDeepSeekKey,
+} from './deepseek.js';
 import { buildRadioPrompt } from './radio-prompt.js';
 import {
   bearerToken,
@@ -115,6 +117,11 @@ async function handleApi(request, env, ctx) {
 
   if (url.pathname === `${API_PREFIX}/key/test`) {
     return json(await testDeepSeekKey({ apiKey, model }));
+  }
+
+  if (url.pathname === `${API_PREFIX}/taste/analyze`) {
+    const lang = body.lang === 'en' ? 'en' : 'zh';
+    return json(await analyzeTaste({ apiKey, model, tracks: body.tracks, lang }));
   }
 
   if (url.pathname !== `${API_PREFIX}/chat`) return json({ error: 'Not found' }, 404);

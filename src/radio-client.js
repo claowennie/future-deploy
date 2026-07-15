@@ -134,6 +134,16 @@ export async function saveRadioProfile({ taste, language, model, playlistUrl = '
   if (error) throw friendlyError(error);
 }
 
+export async function saveRadioTaste(taste) {
+  const { sb, user } = await authContext();
+  const { error } = await sb.from('radio_profiles').upsert({
+    user_id: user.id,
+    taste: String(taste || '').trim().slice(0, 6000),
+    updated_at: new Date().toISOString(),
+  });
+  if (error) throw friendlyError(error);
+}
+
 function audioExtension(file) {
   const ext = String(file?.name || '').split('.').pop().toLowerCase();
   return ALLOWED_EXT.has(ext) ? ext : '';

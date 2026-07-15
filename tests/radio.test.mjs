@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { normalizeModel, RadioOutputError, validateRadioPayload } from '../worker/deepseek.js';
+import {
+  normalizeModel, RadioOutputError, validateRadioPayload, validateTastePayload,
+} from '../worker/deepseek.js';
 import { buildRadioPrompt } from '../worker/radio-prompt.js';
 import radioWorker from '../worker/index.js';
 import { parseYouTubePlaylistUrl } from '../src/radio-client.js';
@@ -13,6 +15,8 @@ console.log('radio.test:');
 
 assert.equal(normalizeModel('deepseek-v4-pro'), 'deepseek-v4-pro');
 assert.equal(normalizeModel('deepseek-chat'), 'deepseek-v4-flash');
+assert.equal(validateTastePayload({ taste: 'Mostly English indie pop.' }), 'Mostly English indie pop.');
+assert.throws(() => validateTastePayload({ taste: '' }), RadioOutputError);
 
 assert.deepEqual(parseYouTubePlaylistUrl('https://music.youtube.com/playlist?list=PL1234567890abc'), {
   provider: 'youtube',
@@ -37,6 +41,9 @@ assert.match(prompt, /Play something calm/);
 assert.match(prompt, /You are Melo/);
 assert.match(prompt, /companionPlaylist/);
 assert.match(prompt, /Never say “我去网易云找”/);
+assert.match(prompt, /Taste is the identity baseline/);
+assert.match(prompt, /75-90%/);
+assert.match(prompt, /language of this website.*not evidence/);
 assert.doesNotMatch(prompt, /Claudio/);
 assert.doesNotMatch(prompt, /storage_path|user\/track-a\.mp3/);
 

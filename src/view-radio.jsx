@@ -8,6 +8,7 @@ import {
   parseYouTubePlaylistUrl,
   radioApi,
   saveRadioProfile,
+  saveRadioTaste,
   setDeepSeekKey,
   signedTrackUrl,
   uploadRadioTrack,
@@ -68,6 +69,33 @@ function mergeResolvedCompanionPlaylist(plan, tracks = []) {
       playbackIndex: index,
     };
   });
+}
+
+function comparableTrackText(value) {
+  return String(value || '').normalize('NFKC').toLowerCase().replace(/[\s·・—–\-_]+/g, '');
+}
+
+function resolveCompanionPlaylistIndex(state, playlist) {
+  if (!Array.isArray(playlist) || !playlist.length) return -1;
+  const stateTitle = comparableTrackText(state?.title);
+  const stateArtist = comparableTrackText(state?.artist);
+  if (stateTitle) {
+    const matches = playlist.map((track, index) => ({
+      index,
+      title: comparableTrackText(track?.title || track?.query),
+      artist: comparableTrackText(track?.artist),
+    })).filter((track) => track.title && (
+      track.title === stateTitle || track.title.includes(stateTitle) || stateTitle.includes(track.title)
+    ));
+    if (matches.length === 1) return matches[0].index;
+    const artistMatch = matches.find((track) => (
+      stateArtist && track.artist && (track.artist.includes(stateArtist) || stateArtist.includes(track.artist))
+    ));
+    if (artistMatch) return artistMatch.index;
+  }
+  const nativeIndex = Number(state?.currentIndex);
+  return Number.isInteger(nativeIndex) && nativeIndex >= 0 && nativeIndex < playlist.length
+    ? nativeIndex : -1;
 }
 
 function preferredSpeechVoice(language) {
@@ -183,6 +211,8 @@ function RadioSettings({
   const [file, setFile] = _us(null);
   const [busy, setBusy] = _us(false);
   const [message, setMessage] = _us('');
+  const [tastePlaylists, setTastePlaylists] = _us([]);
+  const [selectedTastePlaylists, setSelectedTastePlaylists] = _us([]);
   const fileRef = _ur(null);
 
   _ue(() => { if (open) setKeyDraft(apiKey); }, [open, apiKey]);
@@ -259,6 +289,63 @@ function RadioSettings({
     setMessage('已断开本机桥，配对码已从当前标签页清除。');
   };
 
+  const loadTastePlaylists = async () => {
+    if (!requireUser()) return;
+    if (companionStatus !== 'online') {
+      setMessage('请先连接并测试本机桥。');
+      return;
+    }
+    setBusy(true); setMessage('正在读取歌单列表…');
+    try {
+      const result = await sendCompanionCommand(
+        { url: companionUrl, token: companionToken }, 'list_playlists', '', [],
+      );
+      const playlists = Array.isArray(result.playlists) ? result.playlists : [];
+      setTastePlaylists(playlists);
+      setSelectedTastePlaylists((current) => {
+        const available = current.filter((id) => playlists.some((playlist) => playlist.id === id));
+        return available.length ? available : playlists.slice(0, 1).map((playlist) => playlist.id);
+      });
+      setMessage(playlists.length ? '请选择最能代表你口味的 1–3 个歌单。' : '没有找到可分析的自建或收藏歌单。');
+    } catch (error) { setMessage(`${error.message}；请重启最新版 Future Companion 后再试。`); }
+    finally { setBusy(false); }
+  };
+
+  const toggleTastePlaylist = (playlistId) => {
+    setSelectedTastePlaylists((current) => {
+      if (current.includes(playlistId)) return current.filter((id) => id !== playlistId);
+      return current.length >= 3 ? current : [...current, playlistId];
+    });
+  };
+
+  const analyzeTasteFromPlaylists = async () => {
+    if (!requireUser()) return;
+    const key = String(keyDraft || '').trim();
+    if (!key) { setMessage('请先输入 DeepSeek API Key。'); return; }
+    if (!selectedTastePlaylists.length) { setMessage('请至少选择一个歌单。'); return; }
+    setBusy(true); setMessage('正在提取曲目并分析你的音乐口味…');
+    try {
+      const sample = await sendCompanionCommand(
+        { url: companionUrl, token: companionToken },
+        'taste_sample',
+        '',
+        selectedTastePlaylists,
+      );
+      const result = await radioApi('/taste/analyze', {
+        key,
+        body: { model, lang: language, tracks: sample.tracks || [] },
+      });
+      const nextTaste = String(result.taste || '').trim();
+      if (!nextTaste) throw new Error('DeepSeek 没有生成有效的口味画像');
+      setApiKeyState(setDeepSeekKey(key, user.id));
+      setTaste(nextTaste);
+      await saveRadioTaste(nextTaste);
+      setMessage(`已分析 ${result.trackCount || sample.tracks?.length || 0} 首歌并保存。之后推荐会优先遵循这份口味画像。`);
+      onSaved?.();
+    } catch (error) { setMessage(error.message); }
+    finally { setBusy(false); }
+  };
+
   let playlistPreview = null;
   let playlistError = '';
   if (String(playlistUrl || '').trim()) {
@@ -294,10 +381,40 @@ function RadioSettings({
           </select>
         </label>
 
-        <label className="auth-label">我的音乐口味
-          <textarea value={taste} onChange={(event) => setTaste(event.target.value)} rows="5"
-            maxLength="6000" placeholder="例如：喜欢安静、克制、有空间感的音乐；工作时少人声…" />
-        </label>
+        <div className="radio-taste-section">
+          <div className="radio-library-head">
+            <div>
+              <div className="auth-label">我的音乐口味</div>
+              <div className="radio-config-note">
+                从你自己的歌单提取歌名与歌手，让 DS 分析语言比例、常听歌手和曲风。不会上传音频、Cookie 或登录凭证。
+              </div>
+            </div>
+            {taste && <span className="radio-source-ready">已有画像</span>}
+          </div>
+          <div className="radio-setting-actions">
+            <button className="btn" type="button" onClick={loadTastePlaylists}
+              disabled={busy || companionStatus !== 'online'}>读取我的歌单</button>
+            <button className="btn btn-primary" type="button" onClick={analyzeTasteFromPlaylists}
+              disabled={busy || !selectedTastePlaylists.length}>让 DS 分析并保存</button>
+          </div>
+          {tastePlaylists.length > 0 && <div className="radio-taste-playlists">
+            {tastePlaylists.map((playlist) => {
+              const checked = selectedTastePlaylists.includes(playlist.id);
+              const capped = !checked && selectedTastePlaylists.length >= 3;
+              return <label key={playlist.id} className={`radio-taste-playlist ${checked ? 'selected' : ''}`}>
+                <input type="checkbox" checked={checked} disabled={capped || busy}
+                  onChange={() => toggleTastePlaylist(playlist.id)} />
+                <span><b>{playlist.name}</b><small>
+                  {playlist.source === 'created' ? '我创建的' : '我收藏的'} · {playlist.trackCount} 首
+                </small></span>
+              </label>;
+            })}
+          </div>}
+          <label className="auth-label radio-taste-result">DS 生成的口味画像（可以微调）
+            <textarea value={taste} onChange={(event) => setTaste(event.target.value)} rows="6"
+              maxLength="6000" placeholder="点击“读取我的歌单”，选择最能代表你的歌单后自动生成。" />
+          </label>
+        </div>
 
         <div className="radio-source-section">
           <div className="radio-library-head">
@@ -395,6 +512,8 @@ function RadioView() {
   const [companionPlayerState, setCompanionPlayerState] = _us(null);
   const [companionBusy, setCompanionBusy] = _us(false);
   const [companionPlaylist, setCompanionPlaylist] = _us([]);
+  const [companionSeeking, setCompanionSeeking] = _us(false);
+  const [companionSeekDraft, setCompanionSeekDraft] = _us(0);
   const musicRef = _ur(null);
   const youtubePlayerRef = _ur(null);
   const pendingYoutubeActionRef = _ur('');
@@ -410,6 +529,7 @@ function RadioView() {
   try { youtubePlaylist = parseYouTubePlaylistUrl(playlistUrl); }
   catch { youtubePlaylist = null; }
   const youtubePlaylistId = youtubePlaylist?.id || '';
+  const companionActiveIndex = resolveCompanionPlaylistIndex(companionPlayerState, companionPlaylist);
 
   const setLangPersist = (value) => {
     setLang(value);
@@ -588,12 +708,12 @@ function RadioView() {
     setCompanionPlaylist([]);
   };
 
-  const executeCompanionAction = async (action, query = '', queries = []) => {
+  const executeCompanionAction = async (action, query = '', queries = [], options = {}) => {
     if (companionStatus !== 'online') throw new Error('本机桥尚未连接，请先在设置里测试连接');
     setCompanionBusy(true); setErr('');
     try {
       const result = await sendCompanionCommand(
-        { url: companionUrl, token: companionToken }, action, query, queries,
+        { url: companionUrl, token: companionToken }, action, query, queries, options,
       );
       applyCompanionPlayback(result);
       return result;
@@ -605,7 +725,7 @@ function RadioView() {
   };
 
   _ue(() => {
-    const index = Number(companionPlayerState?.currentIndex);
+    const index = companionActiveIndex;
     const item = companionPlaylist[index];
     if (!companionPlanReadyRef.current || companionPlayerState?.status !== 'playing'
       || !Number.isInteger(index) || index < 1 || !item?.intro
@@ -631,10 +751,10 @@ function RadioView() {
         if (token === companionAnnouncementTokenRef.current) setCompanionBusy(false);
       }
     })();
-  }, [companionPlayerState?.currentIndex, companionPlaylist]);
+  }, [companionActiveIndex, companionPlaylist]);
 
   _ue(() => {
-    const currentIndex = Number(companionPlayerState?.currentIndex);
+    const currentIndex = companionActiveIndex;
     const position = Number(companionPlayerState?.position);
     const duration = Number(companionPlayerState?.duration);
     const targetIndex = currentIndex + 1;
@@ -666,10 +786,10 @@ function RadioView() {
       }
     })();
   }, [companionPlayerState?.position, companionPlayerState?.duration,
-    companionPlayerState?.currentIndex, companionPlaylist]);
+    companionActiveIndex, companionPlaylist]);
 
   const stepCompanionWithIntro = async (action) => {
-    const currentIndex = Number(companionPlayerState?.currentIndex);
+    const currentIndex = companionActiveIndex;
     const targetIndex = action === 'next' ? currentIndex + 1 : currentIndex - 1;
     const target = companionPlaylist[targetIndex];
     if (!target?.intro || targetIndex < 0 || announcedCompanionIndexesRef.current.has(targetIndex)) {
@@ -680,6 +800,14 @@ function RadioView() {
     setLog((items) => [...items, { role: 'melo', text: target.intro, kind: 'intro' }]);
     await speak(target.intro);
     return executeCompanionAction(action);
+  };
+
+  const commitCompanionSeek = async (value) => {
+    const duration = Number(companionPlayerState?.duration) || 0;
+    const position = Math.min(duration, Math.max(0, Number(value) || 0));
+    setCompanionSeeking(false);
+    setCompanionSeekDraft(position);
+    return executeCompanionAction('seek', '', [], { position });
   };
 
   const executeYouTubeAction = (action) => {
@@ -749,7 +877,7 @@ function RadioView() {
       ]);
       stopMusic(); pauseYouTube(); setQueue([]);
       try {
-        const currentIndex = Number(companionPlayerState?.currentIndex);
+        const currentIndex = companionActiveIndex;
         const targetIndex = directIntent.action === 'next' ? currentIndex + 1
           : directIntent.action === 'previous' ? currentIndex - 1 : -1;
         const target = companionPlaylist[targetIndex];
@@ -845,8 +973,9 @@ function RadioView() {
   const status = !user ? 'signin' : !apiKey ? 'config' : workerStatus;
   const canSend = status === 'online' && !thinking && !companionBusy && !setupError;
   const recommendationItems = companionPlaylist.length ? companionPlaylist : queue;
-  const recommendationIndex = companionPlaylist.length
-    ? Number(companionPlayerState?.currentIndex) : idx;
+  const recommendationIndex = companionPlaylist.length ? companionActiveIndex : idx;
+  const companionPosition = companionSeeking
+    ? companionSeekDraft : Number(companionPlayerState?.position) || 0;
   const recommendationIsCompanion = companionPlaylist.length > 0;
   const quicks = [
     { label: '🎧 随便放点', text: '' },
@@ -912,13 +1041,30 @@ function RadioView() {
               <div className="radio-now-title">{now.title || '未知曲目'}</div>
               <div className="radio-now-artist">{now.artist || ''}</div>
               {now.source === 'companion' && <>
-                <div className="radio-player-progress" aria-label="播放进度">
-                  <i style={{ width: `${Math.min(100, Math.max(0,
-                    (Number(companionPlayerState?.position) || 0) / Math.max(1, Number(companionPlayerState?.duration) || 1) * 100,
-                  ))}%` }} />
-                </div>
+                <input className="radio-player-progress" type="range" aria-label="拖动播放进度"
+                  min="0" max={Math.max(1, Number(companionPlayerState?.duration) || 1)} step="1"
+                  value={Math.min(Math.max(0, companionPosition), Math.max(1, Number(companionPlayerState?.duration) || 1))}
+                  style={{ '--radio-progress': `${Math.min(100, Math.max(0,
+                    companionPosition / Math.max(1, Number(companionPlayerState?.duration) || 1) * 100,
+                  ))}%` }}
+                  onPointerDown={() => {
+                    setCompanionSeeking(true);
+                    setCompanionSeekDraft(Number(companionPlayerState?.position) || 0);
+                  }}
+                  onChange={(event) => {
+                    setCompanionSeeking(true);
+                    setCompanionSeekDraft(Number(event.target.value));
+                  }}
+                  onPointerUp={(event) => commitCompanionSeek(event.currentTarget.value).catch(() => {})}
+                  onPointerCancel={() => setCompanionSeeking(false)}
+                  onKeyUp={(event) => {
+                    if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+                      commitCompanionSeek(event.currentTarget.value).catch(() => {});
+                    }
+                  }}
+                  disabled={companionBusy || !(Number(companionPlayerState?.duration) > 0)} />
                 <div className="radio-player-time">
-                  <span>{formatPlayerTime(companionPlayerState?.position)}</span>
+                  <span>{formatPlayerTime(companionPosition)}</span>
                   <span>{formatPlayerTime(companionPlayerState?.duration)}</span>
                 </div>
                 <div className="radio-player-controls" aria-label="网易云播放控制">
