@@ -75,7 +75,7 @@ const MELO_COPY = {
     choosePlaylists: '请选择最能代表你口味的 1–3 个歌单。', noPlaylists: '没有找到可分析的自建或收藏歌单。', restartCompanion: '{error}；请重启最新版 Future Companion 后再试。',
     selectPlaylist: '请至少选择一个歌单。', analyzingTaste: '正在提取曲目并分析你的音乐口味…', invalidTaste: 'DeepSeek 没有生成有效的口味画像',
     analyzedTaste: '已分析 {count} 首歌并保存。之后推荐会优先遵循这份口味画像。',
-    pageTitle: '你的 AI 电台', pageSub: '懂你的当下，你的私人 AI 电台。', settings: '设置', languageLabel: 'Melo 语言',
+    pageTitle: '你的 AI 电台', pageSub: '懂你的当下，你的私人 AI 电台。', settings: '设置', languageLabel: 'Melo 播报语言',
     statusSignin: '请登录', statusConfig: '待配置', statusOnline: '云端在线', statusConnecting: '连接中…', statusOffline: 'Worker 离线',
     localOnline: '本机已连接', localChecking: '本机连接中…', localOffline: '本机未连接',
     hintSignin: '登录账号后，每个账号可以使用自己的 DeepSeek Key 与私有曲库。', hintConfig: '还差一步：打开「设置」，输入你自己的 DeepSeek API Key。', hintOffline: '没有连上 Cloudflare Worker。开发时请同时运行前端和 Worker。',
@@ -123,7 +123,7 @@ const MELO_COPY = {
     choosePlaylists: 'Choose 1–3 playlists that best represent your taste.', noPlaylists: 'No created or saved playlists are available for analysis.', restartCompanion: '{error} Please restart the latest Future Companion and try again.',
     selectPlaylist: 'Choose at least one playlist.', analyzingTaste: 'Reading tracks and analyzing your music taste…', invalidTaste: 'DeepSeek did not generate a valid taste profile',
     analyzedTaste: 'Analyzed and saved {count} tracks. Future recommendations will prioritize this taste profile.',
-    pageTitle: 'Your AI Radio', pageSub: 'In tune with this moment—your personal AI radio.', settings: 'Settings', languageLabel: 'Melo language',
+    pageTitle: 'Your AI Radio', pageSub: 'In tune with this moment—your personal AI radio.', settings: 'Settings', languageLabel: 'Melo voice language',
     statusSignin: 'Sign in', statusConfig: 'Setup needed', statusOnline: 'Cloud online', statusConnecting: 'Connecting…', statusOffline: 'Worker offline',
     localOnline: 'Desktop connected', localChecking: 'Desktop connecting…', localOffline: 'Desktop offline',
     hintSignin: 'Sign in to use your own DeepSeek key and private music library.', hintConfig: 'One more step: open Settings and enter your DeepSeek API Key.', hintOffline: 'Could not reach the Cloudflare Worker. In development, run both the frontend and Worker.',
@@ -413,7 +413,7 @@ function YouTubePlaylistPlayer({ playlistId, language, playerRef, onReady, onSta
 
 function RadioSettings({
   open, onClose, user, apiKey, setApiKeyState, model, setModel, taste, setTaste,
-  language, tracks, setTracks, playlistUrl, setPlaylistUrl, onSaved,
+  uiLanguage, voiceLanguage, tracks, setTracks, playlistUrl, setPlaylistUrl, onSaved,
   ttsConfig, onTtsConfigChange, onTestTts,
   companionUrl, setCompanionUrl, companionToken, setCompanionToken,
   companionStatus, onTestCompanion, onDisconnectCompanion,
@@ -431,7 +431,7 @@ function RadioSettings({
   const [voiceBusy, setVoiceBusy] = _us(false);
   const [voiceMessage, setVoiceMessage] = _us('');
   const fileRef = _ur(null);
-  const copy = (key, vars) => meloText(language, key, vars);
+  const copy = (key, vars) => meloText(uiLanguage, key, vars);
 
   _ue(() => {
     if (!open) return;
@@ -471,7 +471,7 @@ function RadioSettings({
     try {
       onTtsConfigChange(normalizeTtsConfig(ttsDraft));
       setApiKeyState(setDeepSeekKey(key, user.id));
-      await saveRadioProfile({ taste, language, model, playlistUrl });
+      await saveRadioProfile({ taste, language: voiceLanguage, model, playlistUrl });
       if (file) {
         const row = await uploadRadioTrack(file, { artist, title });
         if (row) setTracks((items) => [row, ...items]);
@@ -513,7 +513,7 @@ function RadioSettings({
     }
     setVoiceBusy(true); setVoiceMessage(copy('testingVoice'));
     try {
-      await onTestTts(ttsDraft, copy('voiceSample'));
+      await onTestTts(ttsDraft, meloText(voiceLanguage, 'voiceSample'));
       setVoiceMessage(copy('voiceTested'));
     } catch (error) { setVoiceMessage(error.message); }
     finally { setVoiceBusy(false); }
@@ -585,7 +585,7 @@ function RadioSettings({
       );
       const result = await radioApi('/taste/analyze', {
         key,
-        body: { model, lang: language, tracks: sample.tracks || [] },
+        body: { model, lang: uiLanguage, tracks: sample.tracks || [] },
       });
       const nextTaste = String(result.taste || '').trim();
       if (!nextTaste) throw new Error(copy('invalidTaste'));
@@ -603,7 +603,7 @@ function RadioSettings({
   if (String(playlistUrl || '').trim()) {
     try { playlistPreview = parseYouTubePlaylistUrl(playlistUrl); }
     catch (error) {
-      playlistError = language === 'en'
+      playlistError = uiLanguage === 'en'
         ? 'Enter a valid public or unlisted YouTube or YouTube Music playlist link.' : error.message;
     }
   }
@@ -684,7 +684,7 @@ function RadioSettings({
                     [ttsDraft.provider === 'google' ? 'googleVoiceZh' : 'minimaxVoiceZh']: event.target.value,
                   })}>
                   {(ttsDraft.provider === 'google' ? GOOGLE_VOICES : MINIMAX_ZH_VOICES).map((voice) => (
-                    <option key={voice.id} value={voice.id}>{voice[language === 'en' ? 'en' : 'zh']}</option>
+                    <option key={voice.id} value={voice.id}>{voice[uiLanguage === 'en' ? 'en' : 'zh']}</option>
                   ))}
                 </select>
               </label>
@@ -694,7 +694,7 @@ function RadioSettings({
                     [ttsDraft.provider === 'google' ? 'googleVoiceEn' : 'minimaxVoiceEn']: event.target.value,
                   })}>
                   {(ttsDraft.provider === 'google' ? GOOGLE_VOICES : MINIMAX_EN_VOICES).map((voice) => (
-                    <option key={voice.id} value={voice.id}>{voice[language === 'en' ? 'en' : 'zh']}</option>
+                    <option key={voice.id} value={voice.id}>{voice[uiLanguage === 'en' ? 'en' : 'zh']}</option>
                   ))}
                 </select>
               </label>
@@ -818,6 +818,7 @@ function RadioSettings({
 }
 
 function RadioView() {
+  const uiLanguage = getLocale();
   const [workerStatus, setWorkerStatus] = _us('connecting');
   const [user, setUser] = _us(null);
   const [apiKey, setApiKeyState] = _us('');
@@ -836,11 +837,11 @@ function RadioView() {
   const [now, setNow] = _us(null);
   const [playing, setPlaying] = _us(false);
   const [err, setErr] = _us('');
-  const [lang, setLang] = _us(() => {
+  const [voiceLanguage, setVoiceLanguage] = _us(() => {
     const appLanguage = getLocale();
     try {
       const saved = localStorage.getItem('melo_lang') || localStorage.getItem('claudio_lang') || '';
-      const next = appLanguage === 'en' ? 'en' : (saved || appLanguage);
+      const next = saved || appLanguage;
       localStorage.setItem('melo_lang', next);
       localStorage.removeItem('claudio_lang');
       return next;
@@ -860,7 +861,7 @@ function RadioView() {
     catch { return 100; }
   });
   const [companionVolumeOpen, setCompanionVolumeOpen] = _us(false);
-  const langRef = _ur(lang);
+  const voiceLanguageRef = _ur(voiceLanguage);
   const languageChoiceRef = _ur(false);
   const musicRef = _ur(null);
   const youtubePlayerRef = _ur(null);
@@ -893,7 +894,7 @@ function RadioView() {
   catch { youtubePlaylist = null; }
   const youtubePlaylistId = youtubePlaylist?.id || '';
   const companionActiveIndex = resolveCompanionPlaylistIndex(companionPlayerState, companionPlaylist);
-  const copy = (key, vars) => meloText(lang, key, vars);
+  const copy = (key, vars) => meloText(uiLanguage, key, vars);
 
   const updateTtsConfig = (value) => {
     const next = saveTtsConfig(value);
@@ -902,10 +903,10 @@ function RadioView() {
     return next;
   };
 
-  const setLangPersist = (value) => {
+  const setVoiceLanguagePersist = (value) => {
     const next = value === 'en' ? 'en' : 'zh';
-    langRef.current = next;
-    setLang(next);
+    voiceLanguageRef.current = next;
+    setVoiceLanguage(next);
     try {
       localStorage.setItem('melo_lang', next);
       localStorage.removeItem('claudio_lang');
@@ -915,7 +916,7 @@ function RadioView() {
   const changeMeloLanguage = (value) => {
     const next = value === 'en' ? 'en' : 'zh';
     languageChoiceRef.current = true;
-    setLangPersist(next);
+    setVoiceLanguagePersist(next);
     if (user) {
       saveRadioProfile({ taste, language: next, model, playlistUrl }).catch(() => {
         /* Keep the immediate local choice when cloud persistence is temporarily unavailable. */
@@ -960,7 +961,7 @@ function RadioView() {
       setModel(data.profile?.model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash');
       let localLanguage = '';
       try { localLanguage = localStorage.getItem('melo_lang') || ''; } catch { /* ignore */ }
-      if (data.profile?.language && !languageChoiceRef.current && !localLanguage) setLangPersist(data.profile.language);
+      if (data.profile?.language && !languageChoiceRef.current && !localLanguage) setVoiceLanguagePersist(data.profile.language);
       setPlaylistUrl(data.profile?.playlist_provider === 'youtube' ? (data.profile.playlist_url || '') : '');
       setTracks(data.tracks || []);
       setSetupError('');
@@ -1071,7 +1072,7 @@ function RadioView() {
 
   const speakWithConfig = async (text, config, fallbackToBrowser = true) => {
     if (!text) return;
-    const speechLanguage = langRef.current;
+    const speechLanguage = voiceLanguageRef.current;
     const normalized = normalizeTtsConfig(config);
     const requestId = ++speechRequestRef.current;
     stopGeneratedSpeech(generatedSpeechRef);
@@ -1267,7 +1268,7 @@ function RadioView() {
     const target = companionPlaylist[index];
     if (!target || companionStatus !== 'online') return null;
     const playbackIndex = Number.isInteger(target.playbackIndex) ? target.playbackIndex : index;
-    const intro = target.intro || meloText(langRef.current, 'nextIntro', { title: target.title || target.query });
+    const intro = target.intro || meloText(voiceLanguageRef.current, 'nextIntro', { title: target.title || target.query });
     const token = ++companionAnnouncementTokenRef.current;
     companionControlTokenRef.current += 1;
     companionControlPendingRef.current = false;
@@ -1451,7 +1452,7 @@ function RadioView() {
     if (!user) { window.dispatchEvent(new CustomEvent('future:open-auth')); return; }
     const message = String(value ?? input).trim();
     const directIntent = companionStatus === 'online'
-      ? directCompanionIntent(message, langRef.current) : null;
+      ? directCompanionIntent(message, voiceLanguageRef.current) : null;
     setInput(''); setErr('');
 
     if (directIntent) {
@@ -1498,7 +1499,7 @@ function RadioView() {
         key: apiKey,
         body: {
           text: message,
-          lang: langRef.current,
+          lang: voiceLanguageRef.current,
           model,
           hasYoutubePlaylist: !!youtubePlaylistId,
           hasCompanion: companionStatus === 'online',
@@ -1554,7 +1555,7 @@ function RadioView() {
           if (first) {
             announcedCompanionIndexesRef.current = new Set([0]);
             previewCompanionTrack(first, 0, resolved.length);
-            const firstIntro = first.intro || meloText(langRef.current, 'firstIntro', { title: first.title || first.query });
+            const firstIntro = first.intro || meloText(voiceLanguageRef.current, 'firstIntro', { title: first.title || first.query });
             if (firstIntro) {
               setLog((items) => [...items, { role: 'melo', text: firstIntro, kind: 'intro' }]);
               await speak(firstIntro);
@@ -1614,7 +1615,8 @@ function RadioView() {
     <div className="main-inner radio">
       <RadioSettings open={settingsOpen} onClose={() => setSettingsOpen(false)} user={user}
         apiKey={apiKey} setApiKeyState={setApiKeyState} model={model} setModel={setModel}
-        taste={taste} setTaste={setTaste} language={lang} tracks={tracks} setTracks={setTracks}
+        taste={taste} setTaste={setTaste} uiLanguage={uiLanguage} voiceLanguage={voiceLanguage}
+        tracks={tracks} setTracks={setTracks}
         playlistUrl={playlistUrl} setPlaylistUrl={setPlaylistUrl}
         ttsConfig={ttsConfig} onTtsConfigChange={updateTtsConfig} onTestTts={testTts}
         companionUrl={companionUrl} setCompanionUrl={setCompanionUrl}
@@ -1631,8 +1633,8 @@ function RadioView() {
         <div className="radio-hero-right">
           <button className="radio-settings-btn" onClick={() => setSettingsOpen(true)}>{copy('settings')}</button>
           <div className="radio-lang" role="group" aria-label={copy('languageLabel')}>
-            <button className={`radio-lang-btn ${lang === 'zh' ? 'active' : ''}`} onClick={() => changeMeloLanguage('zh')}>中</button>
-            <button className={`radio-lang-btn ${lang === 'en' ? 'active' : ''}`} onClick={() => changeMeloLanguage('en')}>EN</button>
+            <button className={`radio-lang-btn ${voiceLanguage === 'zh' ? 'active' : ''}`} onClick={() => changeMeloLanguage('zh')}>中</button>
+            <button className={`radio-lang-btn ${voiceLanguage === 'en' ? 'active' : ''}`} onClick={() => changeMeloLanguage('en')}>EN</button>
           </div>
           <div className={`radio-status radio-status-${status}`}>
             <span className="dot" />
@@ -1664,7 +1666,7 @@ function RadioView() {
             <div className="radio-now-meta">
               <div className="radio-now-kicker">
                 {now.source === 'companion' ? 'NETEASE · ' : ''}{companionAnnouncingIndex >= 0
-                  ? (lang === 'en' ? 'MELO INTRO' : 'MELO 串词')
+                  ? (uiLanguage === 'en' ? 'MELO INTRO' : 'MELO 串词')
                   : playing ? 'NOW PLAYING' : 'PAUSED'}
               </div>
               <div className="radio-now-title">{now.title || copy('unknownTrack')}</div>
@@ -1767,15 +1769,15 @@ function RadioView() {
       </div>
 
       {recommendationItems.length > 0 && <section className="radio-recommendation"
-        aria-label={lang === 'en' ? 'Melo recommendation set' : 'Melo 推荐歌单'}>
+        aria-label={uiLanguage === 'en' ? 'Melo recommendation set' : 'Melo 推荐歌单'}>
         <div className="radio-recommendation-head">
           <div>
             <div className="radio-now-kicker">MELO'S SET</div>
             <div className="radio-recommendation-title">
-              {lang === 'en' ? 'Picked for this moment' : '此刻为你排的歌单'}
+              {uiLanguage === 'en' ? 'Picked for this moment' : '此刻为你排的歌单'}
             </div>
           </div>
-          <span>{recommendationItems.length} {lang === 'en' ? 'tracks' : '首'}</span>
+          <span>{recommendationItems.length} {uiLanguage === 'en' ? 'tracks' : '首'}</span>
         </div>
         <div className="radio-recommendation-list">
           {recommendationItems.map((track, index) => {
@@ -1812,7 +1814,7 @@ function RadioView() {
           </div>
           <a href={youtubePlaylist.url} target="_blank" rel="noreferrer">{copy('youtubeOpen')}</a>
         </div>
-        <YouTubePlaylistPlayer playlistId={youtubePlaylistId} language={lang} playerRef={youtubePlayerRef}
+        <YouTubePlaylistPlayer playlistId={youtubePlaylistId} language={uiLanguage} playerRef={youtubePlayerRef}
           onReady={handleYouTubeReady}
           onStateChange={(state) => setYoutubePlaying(state === 1)}
           onError={setErr} />

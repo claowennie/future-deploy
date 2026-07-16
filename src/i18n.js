@@ -35,8 +35,6 @@ function setLocale(l) {
   if (!PACKS[l] || l === current) return;
   try {
     localStorage.setItem(KEY, l);
-    localStorage.setItem('melo_lang', l);
-    localStorage.removeItem('claudio_lang');
   } catch { /* ignore */ }
   if (typeof location !== 'undefined') location.reload();
 }
