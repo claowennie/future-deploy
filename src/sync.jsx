@@ -8,6 +8,8 @@ import { stripSeedData } from './data.js';
 import { appConfirm, appAlert } from './modal.jsx';
 import { openPrivacy } from './privacy.jsx';
 import { t } from './i18n.js';
+import { clearTtsKeys } from './tts-client.js';
+import { clearCompanionConfig } from './companion-client.js';
 
 const { useState: _u_s, useEffect: _u_e, useRef: _u_r, useCallback: _u_c } = React;
 
@@ -607,6 +609,8 @@ async function signOutAndClear() {
   try {
     sessionStorage.removeItem('future_deepseek_key_session');
     sessionStorage.removeItem('future_deepseek_key_owner');
+    clearTtsKeys();
+    clearCompanionConfig();
     localStorage.removeItem('study_planner_v2');
     localStorage.removeItem('study_planner_v1');
     localStorage.removeItem('last_edit_at');
@@ -707,6 +711,8 @@ async function deleteAccount() {
     try {
       sessionStorage.removeItem('future_deepseek_key_session');
       sessionStorage.removeItem('future_deepseek_key_owner');
+      clearTtsKeys();
+      clearCompanionConfig();
       localStorage.removeItem('study_planner_v2');
       localStorage.removeItem('study_planner_v1');
       localStorage.removeItem('last_edit_at');

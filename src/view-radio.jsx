@@ -28,6 +28,7 @@ import {
 } from './companion-client.js';
 import { getLocale } from './i18n.js';
 import {
+  clearTtsKeys,
   getTtsConfig,
   GOOGLE_VOICES,
   MINIMAX_EN_VOICES,
@@ -1008,18 +1009,31 @@ function RadioView() {
     const sb = window.sbClient;
     if (!sb) return undefined;
     let alive = true;
+    const clearPrivateSessionState = () => {
+      clearDeepSeekKey();
+      setApiKeyState('');
+      const clearedTts = clearTtsKeys(ttsConfigRef.current);
+      ttsConfigRef.current = clearedTts;
+      setTtsConfigState(clearedTts);
+      clearCompanionConfig();
+      setCompanionToken('');
+      setCompanionStatus('disconnected');
+      setCompanionPlayerState(null);
+    };
     sb.auth.getUser().then(({ data }) => {
       if (!alive) return;
       const initialUser = data.user || null;
       setUser(initialUser);
       setApiKeyState(initialUser ? getDeepSeekKey(initialUser.id) : '');
+      if (!initialUser) clearPrivateSessionState();
     });
     const { data: subscription } = sb.auth.onAuthStateChange((event, session) => {
       const nextUser = session?.user || null;
       setUser(nextUser);
       if (nextUser) setApiKeyState(getDeepSeekKey(nextUser.id));
       if (event === 'SIGNED_OUT' || !nextUser) {
-        clearDeepSeekKey(); setApiKeyState(''); setTracks([]); setPlaylistUrl(''); setQueue([]); setNow(null);
+        clearPrivateSessionState();
+        setTracks([]); setPlaylistUrl(''); setQueue([]); setNow(null);
         companionPlanReadyRef.current = false;
         companionAnnouncementTokenRef.current += 1;
         announcedCompanionIndexesRef.current = new Set();

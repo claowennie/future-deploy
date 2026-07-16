@@ -3,6 +3,7 @@ node_modules/
 dist/
 .wrangler/
 .wrangler-dry-run/
+.npm-audit-cache/
 *.log
 
 # === 密钥 / 本地配置(绝不提交)===

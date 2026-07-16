@@ -5,7 +5,7 @@ import {
 import { buildRadioPrompt, filterRecentCompanionPlaylist } from '../worker/radio-prompt.js';
 import radioWorker from '../worker/index.js';
 import { parseYouTubePlaylistUrl } from '../src/radio-client.js';
-import { normalizeTtsConfig, ttsVoiceForLanguage } from '../src/tts-client.js';
+import { clearTtsKeys, normalizeTtsConfig, ttsVoiceForLanguage } from '../src/tts-client.js';
 import {
   isCompanionTrackNearEnd, mapCompanionVolumeToPlayback, markCompanionPlaybackStarted,
   normalizeCompanionVolume,
@@ -50,6 +50,13 @@ const defaultTts = normalizeTtsConfig({});
 assert.equal(defaultTts.provider, 'browser');
 assert.equal(defaultTts.googleVoiceZh, 'Aoede');
 assert.equal(ttsVoiceForLanguage({ provider: 'minimax' }, 'en'), 'English_CalmWoman');
+const removedTtsKeys = [];
+globalThis.sessionStorage = { removeItem: (key) => removedTtsKeys.push(key) };
+assert.deepEqual(clearTtsKeys({ provider: 'minimax', googleKey: 'google-secret', minimaxKey: 'minimax-secret' }), {
+  ...normalizeTtsConfig({ provider: 'minimax' }), googleKey: '', minimaxKey: '',
+});
+assert.deepEqual(removedTtsKeys.sort(), ['future_melo_google_tts_key', 'future_melo_minimax_tts_key']);
+delete globalThis.sessionStorage;
 const googleTtsRequest = buildTtsRequest({
   provider: 'google', text: '你好', language: 'zh', voice: 'Kore', region: 'cn',
 });

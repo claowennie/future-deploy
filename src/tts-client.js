@@ -91,6 +91,14 @@ export function saveTtsConfig(value) {
   return config;
 }
 
+export function clearTtsKeys(value = {}) {
+  try {
+    sessionStorage.removeItem(GOOGLE_KEY_SESSION);
+    sessionStorage.removeItem(MINIMAX_KEY_SESSION);
+  } catch { /* The returned state is still cleared when storage is unavailable. */ }
+  return normalizeTtsConfig({ ...value, googleKey: '', minimaxKey: '' });
+}
+
 export function ttsProviderKey(config) {
   const normalized = normalizeTtsConfig(config);
   if (normalized.provider === 'google') return normalized.googleKey;

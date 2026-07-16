@@ -7,7 +7,8 @@
 //    （包括非 React 的 modal 文案、通知文本）一次到位，不用给全工程穿 context。
 //  - node 单测会 import dates.js → 本模块：所有浏览器 API 都有 typeof 守卫，
 //    node 里语言固定 zh（测试断言的中文格式不受影响）。
-// 内容类数据（每日语录、反思提示、示例数据）不在 i18n 范围；Melo 的界面与回复语言会同步此设置。
+// 内容类数据（每日语录、反思提示、示例数据）不在 i18n 范围；Melo 的界面跟随此设置，
+// Melo 的朗读与回复语言由电台页内的中 / EN 开关单独控制。
 import { zh } from './locales/zh.js';
 import { en } from './locales/en.js';
 
@@ -28,6 +29,16 @@ function detectLocale() {
 }
 
 let current = detectLocale();
+
+function applyDocumentLocale() {
+  if (typeof document === 'undefined') return;
+  document.documentElement.lang = current === 'en' ? 'en' : 'zh-CN';
+  document.title = current === 'en'
+    ? 'future · Personal Growth Planner'
+    : 'future · 学习规划';
+}
+
+applyDocumentLocale();
 
 function getLocale() { return current; }
 

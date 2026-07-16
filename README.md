@@ -4,10 +4,10 @@
 
 - Cloudflare Workers 同时托管前端静态文件和 `/api/radio/*` API
 - Supabase Auth 验证每个请求，数据库 RLS 隔离不同账号
-- 每位用户使用自己的 DeepSeek API Key（BYOK）
-- Key 只保存在当前标签页的 `sessionStorage`，不写入 Supabase 或 Worker 配置
+- 每位用户使用自己的 DeepSeek API Key（BYOK）；语音默认使用免费的浏览器语音，也可自带 Google Cloud TTS 或 MiniMax Key
+- DeepSeek 与语音 Key 只保存在当前标签页的 `sessionStorage`，关闭标签页、退出登录或删除账号时清除，不写入 Supabase 或 Worker 配置
 - 可导入 YouTube / YouTube Music 公开或不公开歌单，也可把私有音频上传到 Supabase Storage
-- 浏览器负责朗读串词；YouTube 官方播放器负责在线歌单播放
+- Melo 支持浏览器免费语音、Google Chirp 3 HD 与 MiniMax Speech 2.8 HD；YouTube 官方播放器负责在线歌单播放
 
 原目录 `future.v2` 不参与本项目的构建或部署。
 
@@ -20,10 +20,11 @@ Browser
   └─ Cloudflare Worker /api/radio/*
        ├─ verifies the Supabase access token
        ├─ reads radio context through the user's JWT + RLS
-       └─ forwards the request to DeepSeek with the user's temporary Key
+       ├─ forwards radio requests to DeepSeek with the user's temporary Key
+       └─ forwards TTS requests to Google or MiniMax with the user's temporary Key
 ```
 
-Worker 不保存、打印或回传 DeepSeek Key，也不拥有 Supabase `service_role` 密钥。曲目由模型通过受限的 `trackId` 选择，真实私有存储路径只在服务端校验后返回给登录用户。
+Worker 不保存、打印或回传 DeepSeek / TTS Key，也不拥有 Supabase `service_role` 密钥。曲目由模型通过受限的 `trackId` 选择，真实私有存储路径只在服务端校验后返回给登录用户。
 
 ## 1. 准备 Supabase
 
@@ -54,7 +55,7 @@ VITE_VAPID_PUBLIC_KEY=
 VITE_SENTRY_DSN=
 ```
 
-所有 `VITE_*` 值都会进入浏览器产物，因此这里只能放公开配置。DeepSeek Key、Supabase `service_role` Key 或 Cloudflare Token 绝不能放在这里。
+所有 `VITE_*` 值都会进入浏览器产物，因此这里只能放公开配置。DeepSeek / TTS Key、Supabase `service_role` Key 或 Cloudflare Token 绝不能放在这里。
 
 ## 3. Worker 本地配置
 
@@ -82,7 +83,7 @@ npm run dev:worker
 npm run dev
 ```
 
-打开 `http://localhost:5173`。登录后进入 Melo 设置，输入自己的 DeepSeek Key，并导入 YouTube / YouTube Music 歌单或上传音频。Key 在关闭标签页或退出登录后会清除。
+打开 `http://localhost:5173`。登录后进入 Melo 设置，输入自己的 DeepSeek Key，并导入 YouTube / YouTube Music 歌单或上传音频。语音默认无需 Key；选择 Google 或 MiniMax 时再填写相应 Key。所有临时 Key 在关闭标签页、退出登录或删除账号后都会清除。
 
 ## 4. 部署到现有 Cloudflare Worker
 
@@ -110,7 +111,7 @@ SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
 SUPABASE_PUBLISHABLE_KEY=YOUR-SUPABASE-PUBLISHABLE-OR-ANON-KEY
 ```
 
-`deploy:cloudflare` 会在构建环境的临时目录中生成仅供 Wrangler 使用的 Secrets 文件，把两项配置随 Worker 代码一起部署，并立即删除临时文件。值不会进入仓库、网页 bundle 或构建日志。前端和 Worker 会共享这两个公开配置，但不会保存 DeepSeek Key。
+`deploy:cloudflare` 会在构建环境的临时目录中生成仅供 Wrangler 使用的 Secrets 文件，把两项配置随 Worker 代码一起部署，并立即删除临时文件。值不会进入仓库、网页 bundle 或构建日志。前端和 Worker 会共享这两个公开配置，但不会保存用户的 DeepSeek / TTS Key。
 
 如需使用命令行而非 GitHub Builds，可执行：
 
@@ -133,13 +134,16 @@ npx wrangler deploy --secrets-file .env.worker
 ```text
 GET  /api/radio/health
 POST /api/radio/key/test
+POST /api/radio/taste/analyze
 POST /api/radio/chat
+POST /api/radio/tts
 ```
 
-两个 POST 接口都要求：
+所有 POST 接口都要求 Supabase 登录态和同源浏览器请求。DeepSeek 相关接口使用 `X-DeepSeek-Key`，语音接口使用 `X-TTS-Key`：
 
 - `Authorization: Bearer <Supabase access token>`
-- `X-DeepSeek-Key: <the current user's key>`
+- `X-DeepSeek-Key: <the current user's key>`（`key/test`、`taste/analyze`、`chat`）
+- `X-TTS-Key: <the current user's key>`（`tts`，浏览器免费语音不调用此接口）
 - 与站点同源的浏览器请求
 
 生产默认模型是 `deepseek-v4-flash`，可选择 `deepseek-v4-pro`。旧的 `deepseek-chat` / `deepseek-reasoner` 不在允许列表中。
@@ -151,11 +155,11 @@ POST /api/radio/chat
 - 在 Cloudflare 日志中不要新增请求头或请求正文日志
 - 自定义域名启用 HTTPS；保留 `public/_headers` 的 CSP 与安全头
 - Sentry 是可选的；未设置 `VITE_SENTRY_DSN` 时完全禁用
-- DeepSeek 费用和限额归 Key 所有者，Cloudflare 侧限流只用于防止误刷与滥用
+- DeepSeek、Google TTS 与 MiniMax 的费用和限额归 Key 所有者，Cloudflare 侧限流只用于防止误刷与滥用
 
 ## 与自用版的差异
 
-部署版不包含 Claude CLI、Express 中枢、Python TTS、本机音乐目录、网易云 Cookie、QQ 音乐登录态或本地配置文件。语音使用浏览器 `speechSynthesis`；音乐来自当前登录账号的 Supabase 私有曲库，或用户导入的 YouTube / YouTube Music 歌单。
+部署版不包含 Claude CLI、Express 中枢、Python TTS、本机音乐目录、网易云 Cookie、QQ 音乐登录态或本地配置文件。语音默认使用浏览器 `speechSynthesis`，也可由用户自带 Key 调用 Google Chirp 3 HD 或 MiniMax Speech 2.8 HD；音乐来自当前登录账号的 Supabase 私有曲库、用户导入的 YouTube / YouTube Music 歌单，或可选的本机 companion。
 
 ## License
 

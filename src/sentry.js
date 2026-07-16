@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/react';
 
 const dsn = String(window.__FUTURE_PUBLIC_CONFIG__?.sentryDsn || import.meta.env.VITE_SENTRY_DSN || '').trim();
-const SECRET_FIELD = /authorization|api.?key|deepseek|token|password|cookie/i;
+const SECRET_FIELD = /authorization|api.?key|deepseek|tts|mini.?max|google.*key|token|password|cookie/i;
 const DEEPSEEK_KEY = /\bsk-[A-Za-z0-9_-]{10,}\b/g;
 
 function scrubSecrets(value, key = '') {
