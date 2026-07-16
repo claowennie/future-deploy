@@ -4,6 +4,11 @@ const COMPANION_TOKEN_KEY = 'future_companion_token_session';
 export const DEFAULT_COMPANION_URL = 'http://127.0.0.1:45731';
 export const MAX_COMPANION_RECOMMENDATIONS = 10;
 
+export function normalizeCompanionVolume(value, fallback = 100) {
+  const volume = Number(value);
+  return Number.isFinite(volume) ? Math.min(100, Math.max(0, Math.round(volume))) : fallback;
+}
+
 export function isCompanionTrackNearEnd(state, thresholdSeconds = 12) {
   const position = Number(state?.position);
   const duration = Number(state?.duration);
@@ -13,6 +18,24 @@ export function isCompanionTrackNearEnd(state, thresholdSeconds = 12) {
     && Number.isFinite(position) && Number.isFinite(duration)
     && position > 0 && duration > 0
     && remaining >= -2 && remaining <= threshold;
+}
+
+// `ncm-cli play` can resolve a fraction before its state endpoint changes from
+// paused to playing. A successful start command is authoritative for that
+// short window; the regular state poll will replace this optimistic snapshot.
+export function markCompanionPlaybackStarted(result = {}) {
+  const state = result?.state || {};
+  const track = result?.track || {};
+  const artist = Array.isArray(track.artists) ? track.artists.filter(Boolean).join(' / ') : '';
+  return {
+    ...result,
+    state: {
+      ...state,
+      status: 'playing',
+      title: state.title || track.name || '',
+      artist: state.artist || artist,
+    },
+  };
 }
 
 export function normalizeCompanionUrl(value) {
@@ -112,6 +135,9 @@ export function sendCompanionCommand(config, action, query = '', queries = [], o
         })).filter((item) => item.title || item.query),
       } : {}),
       ...(Number.isFinite(Number(options.position)) ? { position: Number(options.position) } : {}),
+      ...(Number.isFinite(Number(options.volume)) ? {
+        volume: normalizeCompanionVolume(options.volume),
+      } : {}),
       ...(Number.isInteger(Number(options.index)) ? { index: Number(options.index) } : {}),
       ...(options.deferPlayback === true ? { deferPlayback: true } : {}),
     },

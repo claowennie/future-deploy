@@ -5,7 +5,9 @@ import {
 import { buildRadioPrompt, filterRecentCompanionPlaylist } from '../worker/radio-prompt.js';
 import radioWorker from '../worker/index.js';
 import { parseYouTubePlaylistUrl } from '../src/radio-client.js';
-import { isCompanionTrackNearEnd } from '../src/companion-client.js';
+import {
+  isCompanionTrackNearEnd, markCompanionPlaybackStarted, normalizeCompanionVolume,
+} from '../src/companion-client.js';
 
 const candidates = [
   { id: 'track-a', artist: 'Artist A', title: 'Song A', storage_path: 'user/track-a.mp3' },
@@ -32,6 +34,25 @@ assert.equal(isCompanionTrackNearEnd({ status: 'playing', position: 7, duration:
 assert.equal(isCompanionTrackNearEnd({ status: 'playing', position: 220, duration: 229 }), true);
 assert.equal(isCompanionTrackNearEnd({ status: 'stopped', position: 229, duration: 229 }), false);
 assert.equal(isCompanionTrackNearEnd({ status: 'playing', position: 0, duration: 0 }), false);
+assert.equal(normalizeCompanionVolume(0), 0);
+assert.equal(normalizeCompanionVolume('58.6'), 59);
+assert.equal(normalizeCompanionVolume(101), 100);
+assert.equal(normalizeCompanionVolume('invalid', 70), 70);
+
+assert.deepEqual(markCompanionPlaybackStarted({
+  ok: true,
+  action: 'play_index',
+  track: { name: 'Yellow', artists: ['Coldplay'] },
+  state: { status: 'paused', position: 0, duration: 0, currentIndex: 0 },
+}), {
+  ok: true,
+  action: 'play_index',
+  track: { name: 'Yellow', artists: ['Coldplay'] },
+  state: {
+    status: 'playing', position: 0, duration: 0, currentIndex: 0,
+    title: 'Yellow', artist: 'Coldplay',
+  },
+});
 
 const prompt = buildRadioPrompt({
   text: 'Play something calm',

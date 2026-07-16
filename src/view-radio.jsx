@@ -20,13 +20,16 @@ import {
   getCompanionConfig,
   getCompanionState,
   isCompanionTrackNearEnd,
+  markCompanionPlaybackStarted,
   MAX_COMPANION_RECOMMENDATIONS,
+  normalizeCompanionVolume,
   sendCompanionCommand,
   setCompanionConfig,
 } from './companion-client.js';
 
 const { useState: _us, useEffect: _ue, useRef: _ur } = React;
 const MUSIC_VOLUME = 0.55;
+const COMPANION_VOLUME_KEY = 'future_companion_volume';
 let youtubeApiPromise = null;
 
 function hueFor(track) {
@@ -531,6 +534,11 @@ function RadioView() {
   const [companionAnnouncingIndex, setCompanionAnnouncingIndex] = _us(-1);
   const [companionSeeking, setCompanionSeeking] = _us(false);
   const [companionSeekDraft, setCompanionSeekDraft] = _us(0);
+  const [companionVolume, setCompanionVolume] = _us(() => {
+    try { return normalizeCompanionVolume(localStorage.getItem(COMPANION_VOLUME_KEY), 100); }
+    catch { return 100; }
+  });
+  const [companionVolumeOpen, setCompanionVolumeOpen] = _us(false);
   const langRef = _ur(lang);
   const languageChoiceRef = _ur(false);
   const musicRef = _ur(null);
@@ -549,6 +557,7 @@ function RadioView() {
   const companionControlPromiseRef = _ur(Promise.resolve());
   const companionPreparationPromiseRef = _ur(Promise.resolve());
   const companionPlayingRef = _ur(false);
+  const companionPreviousVolumeRef = _ur(companionVolume > 0 ? companionVolume : 70);
   const [youtubeReady, setYoutubeReady] = _us(false);
   const [youtubePlaying, setYoutubePlaying] = _us(false);
 
@@ -799,8 +808,10 @@ function RadioView() {
     if (blocksUi) setCompanionBusy(true);
     setErr('');
     try {
+      const requestOptions = ['search_and_play', 'play_daily', 'prepare_index', 'play_index'].includes(action)
+        ? { ...options, volume: companionVolume } : options;
       const result = await sendCompanionCommand(
-        { url: companionUrl, token: companionToken }, action, query, queries, options,
+        { url: companionUrl, token: companionToken }, action, query, queries, requestOptions,
       );
       if (options.applyResult !== false) applyCompanionPlayback(result);
       return result;
@@ -829,7 +840,9 @@ function RadioView() {
     const playbackIndex = Number.isInteger(target?.playbackIndex)
       ? target.playbackIndex : announcingIndex;
     const action = wasPlaying ? 'pause' : announcingIndex >= 0 ? 'play_index' : 'resume';
-    const options = action === 'play_index' ? { index: playbackIndex } : {};
+    const options = action === 'play_index'
+      ? { index: playbackIndex, volume: companionVolume }
+      : action === 'resume' ? { volume: companionVolume } : {};
     const announcementToken = announcingIndex >= 0
       ? ++companionAnnouncementTokenRef.current : companionAnnouncementTokenRef.current;
     if (announcingIndex >= 0) {
@@ -851,7 +864,9 @@ function RadioView() {
       });
       companionControlPromiseRef.current = command;
       const result = await command;
-      if (result && token === companionControlTokenRef.current) applyCompanionPlayback(result);
+      if (result && token === companionControlTokenRef.current) {
+        applyCompanionPlayback(action === 'pause' ? result : markCompanionPlaybackStarted(result));
+      }
     } catch (error) {
       if (token === companionControlTokenRef.current) {
         setOptimisticCompanionPlaying(wasPlaying);
@@ -880,7 +895,9 @@ function RadioView() {
       const config = { url: companionUrl, token: companionToken };
       const preparation = companionPreparationPromiseRef.current.catch(() => {}).then(async () => {
         await companionControlPromiseRef.current.catch(() => {});
-        return sendCompanionCommand(config, 'prepare_index', '', [], { index: playbackIndex });
+        return sendCompanionCommand(config, 'prepare_index', '', [], {
+          index: playbackIndex, volume: companionVolume,
+        });
       });
       companionPreparationPromiseRef.current = preparation;
       const prepared = await preparation;
@@ -889,9 +906,11 @@ function RadioView() {
       setLog((items) => [...items, { role: 'melo', text: intro, kind: 'intro' }]);
       await speak(intro);
       if (token !== companionAnnouncementTokenRef.current) return null;
-      const result = await sendCompanionCommand(config, 'play_index', '', [], { index: playbackIndex });
+      const result = await sendCompanionCommand(config, 'play_index', '', [], {
+        index: playbackIndex, volume: companionVolume,
+      });
       if (token !== companionAnnouncementTokenRef.current) return null;
-      applyCompanionPlayback(result);
+      applyCompanionPlayback(markCompanionPlaybackStarted(result));
       return result;
     } catch (error) {
       if (token === companionAnnouncementTokenRef.current) {
@@ -953,6 +972,31 @@ function RadioView() {
     setCompanionSeeking(false);
     setCompanionSeekDraft(position);
     return executeCompanionAction('seek', '', [], { position });
+  };
+
+  const rememberCompanionVolume = (value) => {
+    const next = normalizeCompanionVolume(value, companionVolume);
+    setCompanionVolume(next);
+    if (next > 0) companionPreviousVolumeRef.current = next;
+    try { localStorage.setItem(COMPANION_VOLUME_KEY, String(next)); }
+    catch { /* keep the value in React state when storage is unavailable */ }
+    return next;
+  };
+
+  const commitCompanionVolume = async (value) => {
+    const next = rememberCompanionVolume(value);
+    return executeCompanionAction('volume', '', [], {
+      volume: next, blockUi: false, applyResult: false,
+    });
+  };
+
+  const toggleCompanionVolume = () => {
+    if (!companionVolumeOpen) {
+      setCompanionVolumeOpen(true);
+      return;
+    }
+    const next = companionVolume > 0 ? 0 : companionPreviousVolumeRef.current || 70;
+    commitCompanionVolume(next).catch(() => {});
   };
 
   const executeYouTubeAction = (action) => {
@@ -1130,9 +1174,11 @@ function RadioView() {
             const playbackIndex = Number.isInteger(first.playbackIndex) ? first.playbackIndex : 0;
             const playingResult = await sendCompanionCommand(
               { url: companionUrl, token: companionToken },
-              'play_index', '', [], { index: playbackIndex },
+              'play_index', '', [], { index: playbackIndex, volume: companionVolume },
             );
-            if (token === companionAnnouncementTokenRef.current) applyCompanionPlayback(playingResult);
+            if (token === companionAnnouncementTokenRef.current) {
+              applyCompanionPlayback(markCompanionPlaybackStarted(playingResult));
+            }
           }
         } else {
           await speak(data.say);
@@ -1261,20 +1307,65 @@ function RadioView() {
                   <span>{formatPlayerTime(companionPlayerState?.duration)}</span>
                 </div>
                 <div className="radio-player-controls" aria-label="网易云播放控制">
-                  <button type="button" aria-label="上一首" title="上一首"
-                    onClick={() => stepCompanionWithIntro('previous').catch(() => {})}
-                    disabled={companionStatus !== 'online'}>‹</button>
-                  <button type="button" className="radio-player-main"
-                    aria-label={playing ? '暂停' : '继续'} title={playing ? '暂停' : '继续'}
-                    onClick={toggleCompanionPlayback}
-                    disabled={companionStatus !== 'online'}>
-                    {playing
-                      ? <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
-                      : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2a1.1 1.1 0 0 0 0-1.8L9.6 4.9c-.7-.4-1.6.1-1.6.9Z" /></svg>}
-                  </button>
-                  <button type="button" aria-label="下一首" title="下一首"
-                    onClick={() => stepCompanionWithIntro('next').catch(() => {})}
-                    disabled={companionStatus !== 'online'}>›</button>
+                  <div className="radio-player-transport">
+                    <button type="button" aria-label="上一首" title="上一首"
+                      onClick={() => stepCompanionWithIntro('previous').catch(() => {})}
+                      disabled={companionStatus !== 'online'}>‹</button>
+                    <button type="button" className="radio-player-main"
+                      aria-label={playing ? '暂停' : '继续'} title={playing ? '暂停' : '继续'}
+                      onClick={toggleCompanionPlayback}
+                      disabled={companionStatus !== 'online'}>
+                      {playing
+                        ? <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                        : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2a1.1 1.1 0 0 0 0-1.8L9.6 4.9c-.7-.4-1.6.1-1.6.9Z" /></svg>}
+                    </button>
+                    <button type="button" aria-label="下一首" title="下一首"
+                      onClick={() => stepCompanionWithIntro('next').catch(() => {})}
+                      disabled={companionStatus !== 'online'}>›</button>
+                  </div>
+                  <div className={`radio-player-volume ${companionVolumeOpen ? 'is-open' : ''}`}
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) setCompanionVolumeOpen(false);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        setCompanionVolumeOpen(false);
+                        event.currentTarget.querySelector('button')?.focus();
+                      }
+                    }}>
+                    {companionVolumeOpen && <div className="radio-volume-popover">
+                      <input type="range" min="0" max="100" step="1"
+                        aria-label="网易云播放音量"
+                        aria-valuetext={`${companionVolume}%`}
+                        value={companionVolume}
+                        style={{ '--radio-volume': `${companionVolume}%` }}
+                        onChange={(event) => rememberCompanionVolume(event.target.value)}
+                        onPointerUp={(event) => commitCompanionVolume(event.currentTarget.value).catch(() => {})}
+                        onKeyUp={(event) => {
+                          if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+                            commitCompanionVolume(event.currentTarget.value).catch(() => {});
+                          }
+                        }}
+                        onBlur={(event) => commitCompanionVolume(event.currentTarget.value).catch(() => {})} />
+                      <span>{companionVolume}</span>
+                    </div>}
+                    <button type="button" className="radio-volume-button"
+                      aria-label={companionVolume > 0 ? `音量 ${companionVolume}，再次点击静音` : '已静音，再次点击恢复音量'}
+                      aria-expanded={companionVolumeOpen}
+                      title={companionVolumeOpen ? (companionVolume > 0 ? '静音' : '恢复音量') : '调节音量'}
+                      onClick={toggleCompanionVolume}
+                      disabled={companionStatus !== 'online'}>
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path className="radio-volume-speaker" d="M4 9.2v5.6h3.4l4.4 3.4V5.8L7.4 9.2H4Z" />
+                        {companionVolume === 0
+                          ? <path className="radio-volume-wave" d="m16 9 4 6m0-6-4 6" />
+                          : <>
+                            <path className="radio-volume-wave" d="M15.3 9.1a4 4 0 0 1 0 5.8" />
+                            {companionVolume > 55 && <path className="radio-volume-wave" d="M18 6.8a7.2 7.2 0 0 1 0 10.4" />}
+                          </>}
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </>}
               {now.unresolved && <div className="radio-warn">无法取得这首歌的临时播放链接，已跳过。</div>}
