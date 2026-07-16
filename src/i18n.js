@@ -36,7 +36,7 @@ function applyDocumentLocale() {
   document.documentElement.lang = current === 'en' ? 'en' : 'zh-CN';
   document.title = current === 'en'
     ? 'future · Personal Growth Planner'
-    : 'future · 学习规划';
+    : 'future · 个人成长规划';
 }
 
 applyDocumentLocale();

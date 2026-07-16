@@ -1,4 +1,4 @@
-// future · 学习规划 — service worker
+// future · 个人成长规划 — service worker
 // 策略：
 //   · 页面导航（HTML）→ 网络优先，离线时退回缓存的 index.html —— 部署新版后
 //     刷新一定拿到新的 hashed bundle 文件名，不会被旧壳卡住；
