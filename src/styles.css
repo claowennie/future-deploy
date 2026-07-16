@@ -3253,13 +3253,11 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   font-variant-numeric: tabular-nums;
 }
 .radio-player-controls {
-  display: grid;
-  grid-template-columns: minmax(30px, 1fr) auto minmax(30px, 1fr);
+  display: flex;
   align-items: center;
   margin-top: 10px;
 }
 .radio-player-transport {
-  grid-column: 2;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -3297,12 +3295,10 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   fill: currentColor;
 }
 .radio-player-volume {
-  grid-column: 3;
-  justify-self: start;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 14px;
+  margin-left: 18px;
 }
 .radio-player-controls button.radio-volume-button {
   flex: none;
@@ -3323,6 +3319,11 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   stroke-width: 1.8;
   stroke-linecap: round;
 }
+.radio-player-volume.is-open .radio-volume-button {
+  border-color: hsl(var(--rad-h) 48% 48%);
+  background: color-mix(in srgb, hsl(var(--rad-h) 58% 52%) 12%, var(--surface));
+  color: hsl(var(--rad-h) 48% 38%);
+}
 .radio-player-volume input {
   --radio-volume: 100%;
   flex: none;
@@ -3334,6 +3335,8 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   border: 0;
   background: transparent;
   cursor: pointer;
+  transform-origin: left center;
+  animation: radioVolumeRailIn .16s ease-out;
 }
 .radio-player-volume input::-webkit-slider-runnable-track {
   height: 4px;
@@ -3378,6 +3381,11 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  animation: radioVolumeRailIn .16s ease-out;
+}
+@keyframes radioVolumeRailIn {
+  from { opacity: 0; transform: translateX(-4px) scaleX(.94); }
+  to { opacity: 1; transform: translateX(0) scaleX(1); }
 }
 .radio-player-controls button:disabled { opacity: .45; cursor: wait; }
 .radio-warn { font-size: 12px; color: var(--warm); margin-top: 6px; }
@@ -3747,7 +3755,7 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   .radio-companion-grid { grid-template-columns: 1fr; }
   .radio-settings-modal { max-height: 92vh; }
   .radio-recommendation-track { align-items: flex-start; flex-direction: column; gap: 2px; }
-  .radio-player-volume { gap: 6px; margin-left: 8px; }
+  .radio-player-volume { gap: 6px; margin-left: 12px; }
   .radio-player-volume input { width: 64px; }
   .radio-volume-value { display: none; }
 }
