@@ -55,7 +55,7 @@ const MELO_COPY = {
     chineseVoice: '中文声线', englishVoice: '英文声线', browserVoiceAuto: '浏览器将自动选择中英文最佳可用声线。',
     testVoice: '试听声音', testingVoice: '正在生成试听…', voiceTested: '试听成功，保存设置后 Melo 将使用这套声音。',
     voiceKeyRequired: '请先填写当前语音服务的 API Key。', voiceKeyCleared: '当前语音服务的 Key 已清除。', voiceKeyInvalid: 'API Key 无效或没有语音调用权限。',
-    voiceQuota: 'MiniMax 账户没有可用的语音额度。请确认余额、Token Plan 及当前 Key 类型。', voiceRateLimited: 'MiniMax 请求过于频繁，请稍后再试听。', voiceConfigInvalid: '当前模型或声线不可用，请检查账号区域后重试。',
+    voiceQuota: 'MiniMax 账户没有可用的语音额度。请确认余额、Token Plan 及当前 Key 类型。', voiceRateLimited: 'MiniMax 请求过于频繁，请稍后再试听。', voiceConfigInvalid: '当前模型或声线不可用，请检查账号区域后重试。', voicePlayBlocked: '浏览器阻止了声音播放，请允许本站播放声音后再试听。', voiceAudioInvalid: 'MiniMax 已响应，但返回的音频无法播放，请换一个声线重试。', voiceNetwork: 'Future 暂时无法连接 MiniMax，请检查所选账号区域后重试。',
     voiceUnavailable: '暂时无法生成云端语音，请检查接口区域、额度或网络后重试。',
     showKey: '显示', hideKey: '隐藏', clearVoiceKey: '清除语音 Key', voiceSample: '你好，我是 Melo。接下来，让我们一起听一首适合此刻的歌。',
     tasteTitle: '我的音乐口味', tasteNote: '从你自己的歌单提取歌名与歌手，让 DS 分析语言比例、常听歌手和曲风。不会上传音频、Cookie 或登录凭证。',
@@ -103,7 +103,7 @@ const MELO_COPY = {
     chineseVoice: 'Chinese voice', englishVoice: 'English voice', browserVoiceAuto: 'The browser will automatically choose the best available Chinese and English voices.',
     testVoice: 'Test voice', testingVoice: 'Generating a voice sample…', voiceTested: 'Voice test successful. Save settings to use it for Melo.',
     voiceKeyRequired: 'Enter an API key for the selected voice provider first.', voiceKeyCleared: 'The selected voice provider key was cleared.', voiceKeyInvalid: 'The API key is invalid or does not have permission to use text-to-speech.',
-    voiceQuota: 'This MiniMax account has no available speech credits. Check the balance, Token Plan, and key type.', voiceRateLimited: 'MiniMax is receiving too many requests. Wait a moment and test again.', voiceConfigInvalid: 'The selected model or voice is unavailable. Check the account region and try again.',
+    voiceQuota: 'This MiniMax account has no available speech credits. Check the balance, Token Plan, and key type.', voiceRateLimited: 'MiniMax is receiving too many requests. Wait a moment and test again.', voiceConfigInvalid: 'The selected model or voice is unavailable. Check the account region and try again.', voicePlayBlocked: 'The browser blocked sound playback. Allow sound for this site, then test again.', voiceAudioInvalid: 'MiniMax responded, but its audio could not be played. Try another voice.', voiceNetwork: 'Future could not reach MiniMax. Check the selected account region and try again.',
     voiceUnavailable: 'Cloud speech could not be generated. Check the API region, quota, or connection and try again.',
     showKey: 'Show', hideKey: 'Hide', clearVoiceKey: 'Clear voice key', voiceSample: 'Hi, I’m Melo. Let’s listen to a song that fits this moment.',
     tasteTitle: 'My music taste', tasteNote: 'Read track and artist names from your playlists so DS can analyze languages, favorite artists, and styles. Audio, cookies, and sign-in credentials are never uploaded.',
@@ -248,14 +248,43 @@ function stopGeneratedSpeech(activeRef) {
   activeRef.current = null;
 }
 
-function playGeneratedSpeech(payload, activeRef) {
+const SILENT_AUDIO = 'data:audio/wav;base64,UklGRiQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQABAACAgICA';
+
+function voicePlaybackError(code) {
+  const error = new Error(code);
+  error.code = code;
+  return error;
+}
+
+function unlockGeneratedSpeech(audioElementRef) {
+  const audio = audioElementRef.current || new Audio();
+  audioElementRef.current = audio;
+  if (!audio.paused) return Promise.resolve();
+  audio.muted = true;
+  audio.src = SILENT_AUDIO;
+  return audio.play().then(() => {
+    audio.pause();
+    audio.currentTime = 0;
+    audio.muted = false;
+    audio.removeAttribute('src');
+  }).catch((error) => {
+    audio.muted = false;
+    audio.removeAttribute('src');
+    throw error;
+  });
+}
+
+function playGeneratedSpeech(payload, activeRef, audioElementRef) {
   const encoded = String(payload?.audioContent || '');
-  if (!encoded) return Promise.reject(new Error('tts_audio_missing'));
+  if (!encoded) return Promise.reject(voicePlaybackError('tts_audio_missing'));
   const binary = atob(encoded);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   const url = URL.createObjectURL(new Blob([bytes], { type: payload.mimeType || 'audio/mpeg' }));
-  const audio = new Audio(url);
+  const audio = audioElementRef.current || new Audio();
+  audioElementRef.current = audio;
+  audio.muted = false;
+  audio.src = url;
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (error) => {
@@ -269,8 +298,10 @@ function playGeneratedSpeech(payload, activeRef) {
     };
     activeRef.current = { audio, stop: () => { audio.pause(); finish(); } };
     audio.onended = () => finish();
-    audio.onerror = () => finish(new Error('tts_audio_play_failed'));
-    audio.play().catch((error) => finish(error));
+    audio.onerror = () => finish(voicePlaybackError('tts_audio_play_failed'));
+    audio.play().catch((error) => finish(voicePlaybackError(
+      error?.name === 'NotAllowedError' ? 'tts_audio_play_blocked' : 'tts_audio_play_failed',
+    )));
   });
 }
 
@@ -836,8 +867,10 @@ function RadioView() {
   const pendingYoutubeActionRef = _ur('');
   const playTokenRef = _ur(0);
   const audioUnlockedRef = _ur(false);
+  const generatedAudioUnlockedRef = _ur(false);
   const ttsConfigRef = _ur(ttsConfig);
   const generatedSpeechRef = _ur(null);
+  const generatedAudioRef = _ur(null);
   const speechRequestRef = _ur(0);
   const announcedCompanionIndexesRef = _ur(new Set());
   const endingCompanionIndexesRef = _ur(new Set());
@@ -1006,6 +1039,8 @@ function RadioView() {
   _ue(() => () => {
     speechRequestRef.current += 1;
     stopGeneratedSpeech(generatedSpeechRef);
+    generatedAudioRef.current?.pause();
+    generatedAudioRef.current = null;
     try { speechSynthesis.cancel(); } catch { /* speech may be unavailable */ }
   }, []);
   _ue(() => {
@@ -1015,16 +1050,23 @@ function RadioView() {
   }, [youtubePlaylistId]);
 
   const unlockAudio = () => {
-    if (audioUnlockedRef.current || !musicRef.current) return;
-    audioUnlockedRef.current = true;
-    const audio = musicRef.current;
-    const previous = audio.getAttribute('src');
-    audio.muted = true;
-    audio.src = 'data:audio/wav;base64,UklGRiQBAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQABAACAgICA';
-    audio.play().then(() => {
-      audio.pause(); audio.muted = false;
-      if (previous) audio.src = previous; else audio.removeAttribute('src');
-    }).catch(() => { audio.muted = false; });
+    if (!audioUnlockedRef.current && musicRef.current) {
+      audioUnlockedRef.current = true;
+      const audio = musicRef.current;
+      const previous = audio.getAttribute('src');
+      audio.muted = true;
+      audio.src = SILENT_AUDIO;
+      audio.play().then(() => {
+        audio.pause(); audio.muted = false;
+        if (previous) audio.src = previous; else audio.removeAttribute('src');
+      }).catch(() => { audio.muted = false; audioUnlockedRef.current = false; });
+    }
+    if (!generatedAudioUnlockedRef.current) {
+      generatedAudioUnlockedRef.current = true;
+      unlockGeneratedSpeech(generatedAudioRef).catch(() => {
+        generatedAudioUnlockedRef.current = false;
+      });
+    }
   };
 
   const speakWithConfig = async (text, config, fallbackToBrowser = true) => {
@@ -1039,7 +1081,7 @@ function RadioView() {
       try {
         const payload = await requestTtsAudio({ text, language: speechLanguage, config: normalized });
         if (requestId !== speechRequestRef.current) return;
-        await playGeneratedSpeech(payload, generatedSpeechRef);
+        await playGeneratedSpeech(payload, generatedSpeechRef, generatedAudioRef);
         return;
       } catch (error) {
         if (!fallbackToBrowser) throw error;
@@ -1056,6 +1098,7 @@ function RadioView() {
   const speak = (text) => speakWithConfig(text, ttsConfigRef.current, true);
 
   const testTts = async (config, sample) => {
+    unlockAudio();
     try { await speakWithConfig(sample, config, false); }
     catch (error) {
       if (['tts_key_required', 'tts_key_invalid'].includes(error.code)) {
@@ -1064,6 +1107,9 @@ function RadioView() {
       if (error.code === 'tts_quota_exhausted') throw new Error(copy('voiceQuota'));
       if (error.code === 'tts_rate_limited') throw new Error(copy('voiceRateLimited'));
       if (error.code === 'tts_configuration_invalid') throw new Error(copy('voiceConfigInvalid'));
+      if (error.code === 'tts_audio_play_blocked') throw new Error(copy('voicePlayBlocked'));
+      if (['tts_audio_missing', 'tts_audio_play_failed'].includes(error.code)) throw new Error(copy('voiceAudioInvalid'));
+      if (error.code === 'tts_network_error') throw new Error(copy('voiceNetwork'));
       throw new Error(copy('voiceUnavailable'));
     }
   };
@@ -1740,9 +1786,11 @@ function RadioView() {
               className={`radio-recommendation-item ${active ? 'active' : ''}`}
               aria-current={active ? 'true' : undefined}
               aria-label={`${copy('playTrack')} ${title}${artist ? ` · ${artist}` : ''}`}
-              onClick={() => (recommendationIsCompanion
-                ? playCompanionRecommendation(index)
-                : playAt(index))}
+              onClick={() => {
+                unlockAudio();
+                if (recommendationIsCompanion) playCompanionRecommendation(index);
+                else playAt(index);
+              }}
               disabled={recommendationIsCompanion && companionStatus !== 'online'}>
               <div className="radio-recommendation-index">{active ? 'NOW' : String(index + 1).padStart(2, '0')}</div>
               <div className="radio-recommendation-copy">
