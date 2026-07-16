@@ -538,7 +538,6 @@ function RadioView() {
     try { return normalizeCompanionVolume(localStorage.getItem(COMPANION_VOLUME_KEY), 100); }
     catch { return 100; }
   });
-  const [companionVolumeOpen, setCompanionVolumeOpen] = _us(false);
   const langRef = _ur(lang);
   const languageChoiceRef = _ur(false);
   const musicRef = _ur(null);
@@ -558,6 +557,8 @@ function RadioView() {
   const companionPreparationPromiseRef = _ur(Promise.resolve());
   const companionPlayingRef = _ur(false);
   const companionPreviousVolumeRef = _ur(companionVolume > 0 ? companionVolume : 70);
+  const companionVolumePendingRef = _ur(null);
+  const companionVolumeRequestRef = _ur(false);
   const [youtubeReady, setYoutubeReady] = _us(false);
   const [youtubePlaying, setYoutubePlaying] = _us(false);
 
@@ -983,20 +984,33 @@ function RadioView() {
     return next;
   };
 
-  const commitCompanionVolume = async (value) => {
-    const next = rememberCompanionVolume(value);
-    return executeCompanionAction('volume', '', [], {
-      volume: next, blockUi: false, applyResult: false,
-    });
+  const flushCompanionVolume = async () => {
+    if (companionVolumeRequestRef.current) return;
+    companionVolumeRequestRef.current = true;
+    try {
+      while (companionVolumePendingRef.current !== null) {
+        const next = companionVolumePendingRef.current;
+        companionVolumePendingRef.current = null;
+        await executeCompanionAction('volume', '', [], {
+          volume: next, blockUi: false, applyResult: false,
+        });
+      }
+    } finally {
+      companionVolumeRequestRef.current = false;
+      if (companionVolumePendingRef.current !== null) {
+        flushCompanionVolume().catch(() => {});
+      }
+    }
   };
 
-  const toggleCompanionVolume = () => {
-    if (!companionVolumeOpen) {
-      setCompanionVolumeOpen(true);
-      return;
-    }
+  const changeCompanionVolume = (value) => {
+    companionVolumePendingRef.current = rememberCompanionVolume(value);
+    flushCompanionVolume().catch(() => {});
+  };
+
+  const toggleCompanionMute = () => {
     const next = companionVolume > 0 ? 0 : companionPreviousVolumeRef.current || 70;
-    commitCompanionVolume(next).catch(() => {});
+    changeCompanionVolume(next);
   };
 
   const executeYouTubeAction = (action) => {
@@ -1323,37 +1337,11 @@ function RadioView() {
                       onClick={() => stepCompanionWithIntro('next').catch(() => {})}
                       disabled={companionStatus !== 'online'}>›</button>
                   </div>
-                  <div className={`radio-player-volume ${companionVolumeOpen ? 'is-open' : ''}`}
-                    onBlur={(event) => {
-                      if (!event.currentTarget.contains(event.relatedTarget)) setCompanionVolumeOpen(false);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') {
-                        setCompanionVolumeOpen(false);
-                        event.currentTarget.querySelector('button')?.focus();
-                      }
-                    }}>
-                    {companionVolumeOpen && <div className="radio-volume-popover">
-                      <input type="range" min="0" max="100" step="1"
-                        aria-label="网易云播放音量"
-                        aria-valuetext={`${companionVolume}%`}
-                        value={companionVolume}
-                        style={{ '--radio-volume': `${companionVolume}%` }}
-                        onChange={(event) => rememberCompanionVolume(event.target.value)}
-                        onPointerUp={(event) => commitCompanionVolume(event.currentTarget.value).catch(() => {})}
-                        onKeyUp={(event) => {
-                          if (['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
-                            commitCompanionVolume(event.currentTarget.value).catch(() => {});
-                          }
-                        }}
-                        onBlur={(event) => commitCompanionVolume(event.currentTarget.value).catch(() => {})} />
-                      <span>{companionVolume}</span>
-                    </div>}
+                  <div className="radio-player-volume">
                     <button type="button" className="radio-volume-button"
-                      aria-label={companionVolume > 0 ? `音量 ${companionVolume}，再次点击静音` : '已静音，再次点击恢复音量'}
-                      aria-expanded={companionVolumeOpen}
-                      title={companionVolumeOpen ? (companionVolume > 0 ? '静音' : '恢复音量') : '调节音量'}
-                      onClick={toggleCompanionVolume}
+                      aria-label={companionVolume > 0 ? `音量 ${companionVolume}，点击静音` : '已静音，点击恢复音量'}
+                      title={companionVolume > 0 ? '静音' : '恢复音量'}
+                      onClick={toggleCompanionMute}
                       disabled={companionStatus !== 'online'}>
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path className="radio-volume-speaker" d="M4 9.2v5.6h3.4l4.4 3.4V5.8L7.4 9.2H4Z" />
@@ -1365,6 +1353,14 @@ function RadioView() {
                           </>}
                       </svg>
                     </button>
+                    <input type="range" min="0" max="100" step="1"
+                      aria-label="网易云播放音量"
+                      aria-valuetext={`${companionVolume}%`}
+                      value={companionVolume}
+                      style={{ '--radio-volume': `${companionVolume}%` }}
+                      onChange={(event) => changeCompanionVolume(event.target.value)}
+                      disabled={companionStatus !== 'online'} />
+                    <span className="radio-volume-value">{companionVolume}</span>
                   </div>
                 </div>
               </>}

@@ -3297,11 +3297,15 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   fill: currentColor;
 }
 .radio-player-volume {
-  position: relative;
   grid-column: 3;
-  justify-self: end;
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 14px;
 }
 .radio-player-controls button.radio-volume-button {
+  flex: none;
   display: grid;
   place-items: center;
   color: var(--ink-soft);
@@ -3319,44 +3323,10 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   stroke-width: 1.8;
   stroke-linecap: round;
 }
-.radio-player-volume.is-open .radio-volume-button {
-  border-color: hsl(var(--rad-h) 48% 48%);
-  background: color-mix(in srgb, hsl(var(--rad-h) 58% 52%) 12%, var(--surface));
-  color: hsl(var(--rad-h) 48% 38%);
-}
-.radio-volume-popover {
-  position: absolute;
-  z-index: 4;
-  right: 0;
-  bottom: calc(100% + 9px);
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 178px;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, hsl(var(--rad-h) 48% 48%) 32%, var(--line));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: 0 12px 28px -12px hsl(var(--rad-h) 45% 20% / .5);
-  backdrop-filter: blur(14px);
-  animation: radioVolumeIn .16s ease-out;
-}
-.radio-volume-popover::after {
-  content: '';
-  position: absolute;
-  right: 10px;
-  bottom: -5px;
-  width: 8px;
-  height: 8px;
-  border-right: 1px solid color-mix(in srgb, hsl(var(--rad-h) 48% 48%) 32%, var(--line));
-  border-bottom: 1px solid color-mix(in srgb, hsl(var(--rad-h) 48% 48%) 32%, var(--line));
-  background: var(--surface);
-  transform: rotate(45deg);
-}
-.radio-volume-popover input {
+.radio-player-volume input {
   --radio-volume: 100%;
-  flex: 1;
-  min-width: 0;
+  flex: none;
+  width: 108px;
   height: 18px;
   margin: 0;
   appearance: none;
@@ -3365,24 +3335,24 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   background: transparent;
   cursor: pointer;
 }
-.radio-volume-popover input::-webkit-slider-runnable-track {
+.radio-player-volume input::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 999px;
   background: linear-gradient(to right,
     hsl(var(--rad-h) 58% 48%) 0 var(--radio-volume),
     color-mix(in srgb, var(--line) 86%, transparent) var(--radio-volume) 100%);
 }
-.radio-volume-popover input::-moz-range-track {
+.radio-player-volume input::-moz-range-track {
   height: 4px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--line) 86%, transparent);
 }
-.radio-volume-popover input::-moz-range-progress {
+.radio-player-volume input::-moz-range-progress {
   height: 4px;
   border-radius: 999px;
   background: hsl(var(--rad-h) 58% 48%);
 }
-.radio-volume-popover input::-webkit-slider-thumb {
+.radio-player-volume input::-webkit-slider-thumb {
   width: 13px;
   height: 13px;
   margin-top: -4.5px;
@@ -3393,24 +3363,21 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   background: hsl(var(--rad-h) 58% 48%);
   box-shadow: 0 1px 5px hsl(var(--rad-h) 40% 20% / .35);
 }
-.radio-volume-popover input::-moz-range-thumb {
+.radio-player-volume input::-moz-range-thumb {
   width: 11px;
   height: 11px;
   border: 2px solid var(--surface);
   border-radius: 50%;
   background: hsl(var(--rad-h) 58% 48%);
 }
-.radio-volume-popover > span {
+.radio-player-volume input:disabled { opacity: .45; cursor: wait; }
+.radio-volume-value {
   width: 24px;
   color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   text-align: right;
-}
-@keyframes radioVolumeIn {
-  from { opacity: 0; transform: translateY(4px) scale(.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .radio-player-controls button:disabled { opacity: .45; cursor: wait; }
 .radio-warn { font-size: 12px; color: var(--warm); margin-top: 6px; }
@@ -3780,6 +3747,9 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   .radio-companion-grid { grid-template-columns: 1fr; }
   .radio-settings-modal { max-height: 92vh; }
   .radio-recommendation-track { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .radio-player-volume { gap: 6px; margin-left: 8px; }
+  .radio-player-volume input { width: 64px; }
+  .radio-volume-value { display: none; }
 }
 
 /* ===== Archive view (历史 · 按月折叠的全部 todo) ===== */

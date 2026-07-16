@@ -6,7 +6,8 @@ import { buildRadioPrompt, filterRecentCompanionPlaylist } from '../worker/radio
 import radioWorker from '../worker/index.js';
 import { parseYouTubePlaylistUrl } from '../src/radio-client.js';
 import {
-  isCompanionTrackNearEnd, markCompanionPlaybackStarted, normalizeCompanionVolume,
+  isCompanionTrackNearEnd, mapCompanionVolumeToPlayback, markCompanionPlaybackStarted,
+  normalizeCompanionVolume,
 } from '../src/companion-client.js';
 
 const candidates = [
@@ -38,6 +39,10 @@ assert.equal(normalizeCompanionVolume(0), 0);
 assert.equal(normalizeCompanionVolume('58.6'), 59);
 assert.equal(normalizeCompanionVolume(101), 100);
 assert.equal(normalizeCompanionVolume('invalid', 70), 70);
+assert.equal(mapCompanionVolumeToPlayback(0), 0);
+assert.equal(mapCompanionVolumeToPlayback(10), 45);
+assert.equal(mapCompanionVolumeToPlayback(50), 78);
+assert.equal(mapCompanionVolumeToPlayback(100), 100);
 
 assert.deepEqual(markCompanionPlaybackStarted({
   ok: true,

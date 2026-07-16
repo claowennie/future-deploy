@@ -9,6 +9,14 @@ export function normalizeCompanionVolume(value, fallback = 100) {
   return Number.isFinite(volume) ? Math.min(100, Math.max(0, Math.round(volume))) : fallback;
 }
 
+// The native player is very quiet through the lower half of its 0-100 range.
+// Keep the UI familiar while lifting that range into a useful listening curve.
+export function mapCompanionVolumeToPlayback(value) {
+  const volume = normalizeCompanionVolume(value);
+  if (volume === 0 || volume === 100) return volume;
+  return Math.round(100 * ((volume / 100) ** 0.35));
+}
+
 export function isCompanionTrackNearEnd(state, thresholdSeconds = 12) {
   const position = Number(state?.position);
   const duration = Number(state?.duration);
@@ -136,7 +144,7 @@ export function sendCompanionCommand(config, action, query = '', queries = [], o
       } : {}),
       ...(Number.isFinite(Number(options.position)) ? { position: Number(options.position) } : {}),
       ...(Number.isFinite(Number(options.volume)) ? {
-        volume: normalizeCompanionVolume(options.volume),
+        volume: mapCompanionVolumeToPlayback(options.volume),
       } : {}),
       ...(Number.isInteger(Number(options.index)) ? { index: Number(options.index) } : {}),
       ...(options.deferPlayback === true ? { deferPlayback: true } : {}),
