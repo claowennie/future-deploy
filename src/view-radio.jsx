@@ -26,11 +26,97 @@ import {
   sendCompanionCommand,
   setCompanionConfig,
 } from './companion-client.js';
+import { getLocale } from './i18n.js';
 
 const { useState: _us, useEffect: _ue, useRef: _ur } = React;
 const MUSIC_VOLUME = 0.55;
 const COMPANION_VOLUME_KEY = 'future_companion_volume';
 let youtubeApiPromise = null;
+
+const MELO_COPY = {
+  zh: {
+    close: '关闭', settingsTitle: 'Melo 电台设置', settingsSub: '每个账号使用自己的模型 Key 和私有曲库。',
+    signInConfig: '请先登录，再配置 AI 电台。', keyNote: '默认只存当前标签页；不会写入 Supabase、构建产物或日志。',
+    testConnection: '测试连接', clearKey: '清除 Key', model: '模型', modelFast: 'DeepSeek V4 Flash · 快速', modelStrong: 'DeepSeek V4 Pro · 更强',
+    tasteTitle: '我的音乐口味', tasteNote: '从你自己的歌单提取歌名与歌手，让 DS 分析语言比例、常听歌手和曲风。不会上传音频、Cookie 或登录凭证。',
+    tasteReady: '已有画像', readPlaylists: '读取我的歌单', analyzeTaste: '让 DS 分析并保存', created: '我创建的', collected: '我收藏的',
+    tracks: '{count} 首', tasteResult: 'DS 生成的口味画像（可以微调）', tastePlaceholder: '点击“读取我的歌单”，选择最能代表你的歌单后自动生成。',
+    sourceA: '方式 A · 导入在线歌单', sourceANote: '支持 YouTube 与 YouTube Music 的公开或不公开歌单链接。', recognized: '已识别',
+    playlistPlaceholder: '粘贴 youtube.com 或 music.youtube.com 的歌单链接', youtubeAuthNote: '账号登录由 YouTube 官方页面完成；如需登录，请点“在 YouTube 打开”完成后返回。本站不会收到你的 YouTube 密码。私人歌单暂不支持。',
+    sourceB: '方式 B · 网易云桌面桥', sourceBNote: '可选功能。音乐与登录凭证都留在你的电脑；网站只发送白名单播放指令。',
+    connected: '已连接', checking: '连接中', disconnected: '未连接', companionPlaceholder: '粘贴 future-companion 显示的本机配对码',
+    testCompanion: '测试本机桥', disconnect: '断开', companionNote: '配对码只保存在当前标签页，不会上传到 Supabase、DeepSeek 或 Cloudflare。',
+    sourceC: '方式 C · 上传私有音频', sourceCNote: '音频直接上传到你的 Supabase 私有存储，单曲不超过 30 MB。',
+    artist: '歌手', requiredTitle: '歌名（必填）', delete: '删除', processing: '处理中…', saveUpload: '保存设置并上传', saveSettings: '保存设置',
+    signInMessage: '请先登录账号', enterKey: '请先输入 DeepSeek API Key', verifying: '正在验证…', keyConnected: '连接成功，Key 仅保存在当前标签页。',
+    enterTestKey: '请先输入并测试 DeepSeek API Key', saving: '正在保存…', saved: '已保存。', deleteConfirm: '删除「{title}」？音频也会永久删除。',
+    keyCleared: '当前标签页中的 Key 已清除。', companionConnecting: '正在连接本机桥…', companionConnectedMessage: '本机桥已连接。现在可以让 Melo 控制这台电脑上的网易云播放。',
+    companionDisconnectedMessage: '已断开本机桥，配对码已从当前标签页清除。', connectCompanionFirst: '请先连接并测试本机桥。', readingPlaylists: '正在读取歌单列表…',
+    choosePlaylists: '请选择最能代表你口味的 1–3 个歌单。', noPlaylists: '没有找到可分析的自建或收藏歌单。', restartCompanion: '{error}；请重启最新版 Future Companion 后再试。',
+    selectPlaylist: '请至少选择一个歌单。', analyzingTaste: '正在提取曲目并分析你的音乐口味…', invalidTaste: 'DeepSeek 没有生成有效的口味画像',
+    analyzedTaste: '已分析 {count} 首歌并保存。之后推荐会优先遵循这份口味画像。',
+    pageTitle: '你的 AI 电台', pageSub: '懂你的当下，你的私人 AI 电台。', settings: '设置', languageLabel: 'Melo 语言',
+    statusSignin: '请登录', statusConfig: '待配置', statusOnline: '云端在线', statusConnecting: '连接中…', statusOffline: 'Worker 离线',
+    localOnline: '本机已连接', localChecking: '本机连接中…', localOffline: '本机未连接',
+    hintSignin: '登录账号后，每个账号可以使用自己的 DeepSeek Key 与私有曲库。', hintConfig: '还差一步：打开「设置」，输入你自己的 DeepSeek API Key。', hintOffline: '没有连上 Cloudflare Worker。开发时请同时运行前端和 Worker。',
+    unknownTrack: '未知曲目', progressLabel: '拖动播放进度', controlsLabel: '网易云播放控制', previous: '上一首', pause: '暂停', resume: '继续', next: '下一首',
+    volumeButton: '调节音量，当前 {volume}', collapseVolume: '收起音量滑轨', expandVolume: '展开音量滑轨', volumeSlider: '网易云播放音量',
+    unresolved: '无法取得这首歌的临时播放链接，已跳过。', emptyTracks: '跟 Melo 说句话，开始一段只属于你的电台。',
+    emptyCompanion: '网易云本机桥已连接。可以说“播放每日推荐”或“在网易云播放起风了”。', emptyYoutube: '歌单已导入。先在下方官方播放器点一次播放，之后就可以让 Melo 控制。',
+    emptyDefault: '在设置里连接网易云桌面桥、导入 YouTube 歌单或上传自己的音乐，再让 Melo 开始播放。', fallbackTrack: '待确认曲目',
+    pickedTitle: '此刻为你排的歌单', playTrack: '播放', youtubeTitle: '你的在线歌单', youtubeOpen: '在 YouTube 打开 ↗', youtubeLoading: '正在载入官方播放器…',
+    youtubeNote: '第一次请手动点一次播放；如需登录，先点右上角“在 YouTube 打开”。之后可以直接对 Melo 说“播放”“下一首”或“随机播放”。',
+    thinking: 'Melo 正在想…', inputPlaceholder: '跟 Melo 说点什么…（想听什么 / 现在的心情）', play: '播', randomLabel: '🎧 随便放点', workLabel: '💻 我在工作', tiredLabel: '😮‍💨 我有点累', nightLabel: '🌙 深夜了',
+    workPrompt: '我在专注工作，给我点不分心的', tiredPrompt: '今天有点累，来点温柔的', nightPrompt: '深夜了，放点适合现在的', randomMessage: '（随便放点）',
+    nextIntro: '接下来换到 {title}。', firstIntro: '先从 {title} 开始。', companionNotConnected: '本机桥尚未连接，请先在设置里测试连接',
+    youtubePreparing: 'YouTube 播放器还在准备；如果浏览器阻止自动播放，请先在播放器里点一次播放。', youtubeControlFailed: '无法控制 YouTube 播放器，请先在播放器里点一次播放。',
+    browserPlayFailed: '浏览器未允许播放，请点一下播放器。', youtubeLoadTimeout: 'YouTube 播放器加载超时', youtubeInitFailed: 'YouTube 播放器初始化失败', youtubeLoadFailed: '无法载入 YouTube 播放器', youtubePlaylistFailed: '这个歌单暂时无法播放，请确认它不是私人歌单。',
+  },
+  en: {
+    close: 'Close', settingsTitle: 'Melo Radio Settings', settingsSub: 'Each account uses its own model key and private music library.',
+    signInConfig: 'Sign in before configuring AI Radio.', keyNote: 'Stored in this tab only; never written to Supabase, build output, or logs.',
+    testConnection: 'Test connection', clearKey: 'Clear key', model: 'Model', modelFast: 'DeepSeek V4 Flash · Faster', modelStrong: 'DeepSeek V4 Pro · Stronger',
+    tasteTitle: 'My music taste', tasteNote: 'Read track and artist names from your playlists so DS can analyze languages, favorite artists, and styles. Audio, cookies, and sign-in credentials are never uploaded.',
+    tasteReady: 'Profile ready', readPlaylists: 'Load my playlists', analyzeTaste: 'Analyze & save with DS', created: 'Created by me', collected: 'Saved by me',
+    tracks: '{count} tracks', tasteResult: 'Taste profile generated by DS (editable)', tastePlaceholder: 'Load your playlists, then choose the ones that best represent your taste.',
+    sourceA: 'Option A · Import an online playlist', sourceANote: 'Supports public and unlisted YouTube or YouTube Music playlist links.', recognized: 'Recognized',
+    playlistPlaceholder: 'Paste a youtube.com or music.youtube.com playlist link', youtubeAuthNote: 'YouTube sign-in happens on the official YouTube page. If needed, choose “Open in YouTube,” sign in, then return. This site never receives your YouTube password. Private playlists are not supported yet.',
+    sourceB: 'Option B · NetEase desktop companion', sourceBNote: 'Optional. Music and sign-in credentials stay on your computer; the site sends allowlisted playback commands only.',
+    connected: 'Connected', checking: 'Connecting', disconnected: 'Not connected', companionPlaceholder: 'Paste the pairing code shown by future-companion',
+    testCompanion: 'Test companion', disconnect: 'Disconnect', companionNote: 'The pairing code stays in this tab and is never uploaded to Supabase, DeepSeek, or Cloudflare.',
+    sourceC: 'Option C · Upload private audio', sourceCNote: 'Audio uploads directly to your private Supabase storage. Maximum 30 MB per track.',
+    artist: 'Artist', requiredTitle: 'Track title (required)', delete: 'Delete', processing: 'Working…', saveUpload: 'Save settings & upload', saveSettings: 'Save settings',
+    signInMessage: 'Please sign in first', enterKey: 'Enter a DeepSeek API Key first', verifying: 'Verifying…', keyConnected: 'Connected. The key is stored in this tab only.',
+    enterTestKey: 'Enter and test your DeepSeek API Key first', saving: 'Saving…', saved: 'Saved.', deleteConfirm: 'Delete “{title}”? Its audio file will be permanently removed too.',
+    keyCleared: 'The key was cleared from this tab.', companionConnecting: 'Connecting to the desktop companion…', companionConnectedMessage: 'Desktop companion connected. Melo can now control NetEase playback on this computer.',
+    companionDisconnectedMessage: 'Desktop companion disconnected and its pairing code was cleared from this tab.', connectCompanionFirst: 'Connect and test the desktop companion first.', readingPlaylists: 'Loading playlist list…',
+    choosePlaylists: 'Choose 1–3 playlists that best represent your taste.', noPlaylists: 'No created or saved playlists are available for analysis.', restartCompanion: '{error} Please restart the latest Future Companion and try again.',
+    selectPlaylist: 'Choose at least one playlist.', analyzingTaste: 'Reading tracks and analyzing your music taste…', invalidTaste: 'DeepSeek did not generate a valid taste profile',
+    analyzedTaste: 'Analyzed and saved {count} tracks. Future recommendations will prioritize this taste profile.',
+    pageTitle: 'Your AI Radio', pageSub: 'In tune with this moment—your personal AI radio.', settings: 'Settings', languageLabel: 'Melo language',
+    statusSignin: 'Sign in', statusConfig: 'Setup needed', statusOnline: 'Cloud online', statusConnecting: 'Connecting…', statusOffline: 'Worker offline',
+    localOnline: 'Desktop connected', localChecking: 'Desktop connecting…', localOffline: 'Desktop offline',
+    hintSignin: 'Sign in to use your own DeepSeek key and private music library.', hintConfig: 'One more step: open Settings and enter your DeepSeek API Key.', hintOffline: 'Could not reach the Cloudflare Worker. In development, run both the frontend and Worker.',
+    unknownTrack: 'Unknown track', progressLabel: 'Seek playback position', controlsLabel: 'NetEase playback controls', previous: 'Previous', pause: 'Pause', resume: 'Resume', next: 'Next',
+    volumeButton: 'Adjust volume, currently {volume}', collapseVolume: 'Collapse volume slider', expandVolume: 'Expand volume slider', volumeSlider: 'NetEase playback volume',
+    unresolved: 'A temporary playback URL was unavailable, so this track was skipped.', emptyTracks: 'Say something to Melo and start a radio session made for you.',
+    emptyCompanion: 'NetEase desktop companion is connected. Try “play my daily recommendations” or ask for a song.', emptyYoutube: 'Playlist imported. Start the official player once below, then Melo can control it.',
+    emptyDefault: 'Connect the NetEase desktop companion, import a YouTube playlist, or upload music in Settings to get started.', fallbackTrack: 'Track to be confirmed',
+    pickedTitle: 'Picked for this moment', playTrack: 'Play', youtubeTitle: 'Your online playlist', youtubeOpen: 'Open in YouTube ↗', youtubeLoading: 'Loading the official player…',
+    youtubeNote: 'Start playback manually once. If sign-in is needed, choose “Open in YouTube” above, then return. After that, ask Melo to play, skip, or shuffle.',
+    thinking: 'Melo is thinking…', inputPlaceholder: 'Tell Melo what you want to hear or how you feel…', play: 'Play', randomLabel: '🎧 Play anything', workLabel: '💻 I’m working', tiredLabel: '😮‍💨 I’m tired', nightLabel: '🌙 It’s late',
+    workPrompt: 'I’m focusing on work. Play something that will not distract me.', tiredPrompt: 'I’m a little tired today. Play something gentle.', nightPrompt: 'It’s late. Play something that fits this moment.', randomMessage: '(Play anything)',
+    nextIntro: 'Next, let’s move to {title}.', firstIntro: 'Let’s begin with {title}.', companionNotConnected: 'Desktop companion is not connected. Test it in Settings first.',
+    youtubePreparing: 'The YouTube player is still getting ready. If autoplay is blocked, start it manually once.', youtubeControlFailed: 'Could not control the YouTube player. Start it manually once and try again.',
+    browserPlayFailed: 'The browser blocked playback. Click the player once.', youtubeLoadTimeout: 'YouTube player timed out while loading', youtubeInitFailed: 'YouTube player could not initialize', youtubeLoadFailed: 'Could not load the YouTube player', youtubePlaylistFailed: 'This playlist cannot be played right now. Make sure it is not private.',
+  },
+};
+
+function meloText(language, key, vars) {
+  let value = MELO_COPY[language === 'en' ? 'en' : 'zh'][key] || MELO_COPY.zh[key] || key;
+  if (vars) Object.entries(vars).forEach(([name, replacement]) => { value = value.split(`{${name}}`).join(String(replacement)); });
+  return value;
+}
 
 function hueFor(track) {
   if (track && Number.isFinite(Number(track.hue))) return ((Math.round(Number(track.hue)) % 360) + 360) % 360;
@@ -146,20 +232,20 @@ function directCompanionIntent(value, language = 'zh') {
   return null;
 }
 
-function loadYouTubeIframeApi() {
+function loadYouTubeIframeApi(language = 'zh') {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   if (youtubeApiPromise) return youtubeApiPromise;
   youtubeApiPromise = new Promise((resolve, reject) => {
     const previousReady = window.onYouTubeIframeAPIReady;
     const timer = window.setTimeout(() => {
       youtubeApiPromise = null;
-      reject(new Error('YouTube 播放器加载超时'));
+      reject(new Error(meloText(language, 'youtubeLoadTimeout')));
     }, 15000);
     window.onYouTubeIframeAPIReady = () => {
       try { previousReady?.(); } catch { /* ignore other integrations */ }
       window.clearTimeout(timer);
       if (window.YT?.Player) resolve(window.YT);
-      else reject(new Error('YouTube 播放器初始化失败'));
+      else reject(new Error(meloText(language, 'youtubeInitFailed')));
     };
     if (!document.querySelector('script[data-melo-youtube-api]')) {
       const script = document.createElement('script');
@@ -169,7 +255,7 @@ function loadYouTubeIframeApi() {
       script.onerror = () => {
         window.clearTimeout(timer);
         youtubeApiPromise = null;
-        reject(new Error('无法载入 YouTube 播放器'));
+        reject(new Error(meloText(language, 'youtubeLoadFailed')));
       };
       document.head.appendChild(script);
     }
@@ -177,7 +263,7 @@ function loadYouTubeIframeApi() {
   return youtubeApiPromise;
 }
 
-function YouTubePlaylistPlayer({ playlistId, playerRef, onReady, onStateChange, onError }) {
+function YouTubePlaylistPlayer({ playlistId, language, playerRef, onReady, onStateChange, onError }) {
   const mountRef = _ur(null);
 
   _ue(() => {
@@ -185,7 +271,7 @@ function YouTubePlaylistPlayer({ playlistId, playerRef, onReady, onStateChange, 
     let alive = true;
     let player = null;
     playerRef.current = null;
-    loadYouTubeIframeApi().then((YT) => {
+    loadYouTubeIframeApi(language).then((YT) => {
       if (!alive || !mountRef.current) return;
       player = new YT.Player(mountRef.current, {
         width: '100%',
@@ -204,7 +290,7 @@ function YouTubePlaylistPlayer({ playlistId, playerRef, onReady, onStateChange, 
             onReady?.(event.target);
           },
           onStateChange: (event) => { if (alive) onStateChange?.(event.data); },
-          onError: () => { if (alive) onError?.('这个歌单暂时无法播放，请确认它不是私人歌单。'); },
+          onError: () => { if (alive) onError?.(meloText(language, 'youtubePlaylistFailed')); },
         },
       });
     }).catch((error) => { if (alive) onError?.(error.message); });
@@ -233,13 +319,14 @@ function RadioSettings({
   const [tastePlaylists, setTastePlaylists] = _us([]);
   const [selectedTastePlaylists, setSelectedTastePlaylists] = _us([]);
   const fileRef = _ur(null);
+  const copy = (key, vars) => meloText(language, key, vars);
 
   _ue(() => { if (open) setKeyDraft(apiKey); }, [open, apiKey]);
   if (!open) return null;
 
   const requireUser = () => {
     if (user) return true;
-    setMessage('请先登录账号');
+    setMessage(copy('signInMessage'));
     window.dispatchEvent(new CustomEvent('future:open-auth'));
     return false;
   };
@@ -247,12 +334,12 @@ function RadioSettings({
   const testKey = async () => {
     if (!requireUser()) return;
     const key = String(keyDraft || '').trim();
-    if (!key) { setMessage('请先输入 DeepSeek API Key'); return; }
-    setBusy(true); setMessage('正在验证…');
+    if (!key) { setMessage(copy('enterKey')); return; }
+    setBusy(true); setMessage(copy('verifying'));
     try {
       await radioApi('/key/test', { key, body: { model } });
       setApiKeyState(setDeepSeekKey(key, user.id));
-      setMessage('连接成功，Key 仅保存在当前标签页。');
+      setMessage(copy('keyConnected'));
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
   };
@@ -260,8 +347,8 @@ function RadioSettings({
   const save = async () => {
     if (!requireUser()) return;
     const key = String(keyDraft || '').trim();
-    if (!key) { setMessage('请先输入并测试 DeepSeek API Key'); return; }
-    setBusy(true); setMessage('正在保存…');
+    if (!key) { setMessage(copy('enterTestKey')); return; }
+    setBusy(true); setMessage(copy('saving'));
     try {
       setApiKeyState(setDeepSeekKey(key, user.id));
       await saveRadioProfile({ taste, language, model, playlistUrl });
@@ -271,14 +358,14 @@ function RadioSettings({
         setArtist(''); setTitle(''); setFile(null);
         if (fileRef.current) fileRef.current.value = '';
       }
-      setMessage('已保存。');
+      setMessage(copy('saved'));
       onSaved?.();
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
   };
 
   const removeTrack = async (track) => {
-    if (!window.confirm(`删除「${track.title}」？音频也会永久删除。`)) return;
+    if (!window.confirm(copy('deleteConfirm', { title: track.title }))) return;
     setBusy(true); setMessage('');
     try {
       await deleteRadioTrack(track);
@@ -291,30 +378,30 @@ function RadioSettings({
     clearDeepSeekKey();
     setApiKeyState('');
     setKeyDraft('');
-    setMessage('当前标签页中的 Key 已清除。');
+    setMessage(copy('keyCleared'));
   };
 
   const testCompanion = async () => {
-    setBusy(true); setMessage('正在连接本机桥…');
+    setBusy(true); setMessage(copy('companionConnecting'));
     try {
       await onTestCompanion({ url: companionUrl, token: companionToken });
-      setMessage('本机桥已连接。现在可以让 Melo 控制这台电脑上的网易云播放。');
+      setMessage(copy('companionConnectedMessage'));
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
   };
 
   const disconnectCompanion = () => {
     onDisconnectCompanion();
-    setMessage('已断开本机桥，配对码已从当前标签页清除。');
+    setMessage(copy('companionDisconnectedMessage'));
   };
 
   const loadTastePlaylists = async () => {
     if (!requireUser()) return;
     if (companionStatus !== 'online') {
-      setMessage('请先连接并测试本机桥。');
+      setMessage(copy('connectCompanionFirst'));
       return;
     }
-    setBusy(true); setMessage('正在读取歌单列表…');
+    setBusy(true); setMessage(copy('readingPlaylists'));
     try {
       const result = await sendCompanionCommand(
         { url: companionUrl, token: companionToken }, 'list_playlists', '', [],
@@ -325,8 +412,8 @@ function RadioSettings({
         const available = current.filter((id) => playlists.some((playlist) => playlist.id === id));
         return available.length ? available : playlists.slice(0, 1).map((playlist) => playlist.id);
       });
-      setMessage(playlists.length ? '请选择最能代表你口味的 1–3 个歌单。' : '没有找到可分析的自建或收藏歌单。');
-    } catch (error) { setMessage(`${error.message}；请重启最新版 Future Companion 后再试。`); }
+      setMessage(copy(playlists.length ? 'choosePlaylists' : 'noPlaylists'));
+    } catch (error) { setMessage(copy('restartCompanion', { error: error.message })); }
     finally { setBusy(false); }
   };
 
@@ -340,9 +427,9 @@ function RadioSettings({
   const analyzeTasteFromPlaylists = async () => {
     if (!requireUser()) return;
     const key = String(keyDraft || '').trim();
-    if (!key) { setMessage('请先输入 DeepSeek API Key。'); return; }
-    if (!selectedTastePlaylists.length) { setMessage('请至少选择一个歌单。'); return; }
-    setBusy(true); setMessage('正在提取曲目并分析你的音乐口味…');
+    if (!key) { setMessage(copy('enterKey')); return; }
+    if (!selectedTastePlaylists.length) { setMessage(copy('selectPlaylist')); return; }
+    setBusy(true); setMessage(copy('analyzingTaste'));
     try {
       const sample = await sendCompanionCommand(
         { url: companionUrl, token: companionToken },
@@ -355,11 +442,11 @@ function RadioSettings({
         body: { model, lang: language, tracks: sample.tracks || [] },
       });
       const nextTaste = String(result.taste || '').trim();
-      if (!nextTaste) throw new Error('DeepSeek 没有生成有效的口味画像');
+      if (!nextTaste) throw new Error(copy('invalidTaste'));
       setApiKeyState(setDeepSeekKey(key, user.id));
       setTaste(nextTaste);
       await saveRadioTaste(nextTaste);
-      setMessage(`已分析 ${result.trackCount || sample.tracks?.length || 0} 首歌并保存。之后推荐会优先遵循这份口味画像。`);
+      setMessage(copy('analyzedTaste', { count: result.trackCount || sample.tracks?.length || 0 }));
       onSaved?.();
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
@@ -369,52 +456,53 @@ function RadioSettings({
   let playlistError = '';
   if (String(playlistUrl || '').trim()) {
     try { playlistPreview = parseYouTubePlaylistUrl(playlistUrl); }
-    catch (error) { playlistError = error.message; }
+    catch (error) {
+      playlistError = language === 'en'
+        ? 'Enter a valid public or unlisted YouTube or YouTube Music playlist link.' : error.message;
+    }
   }
 
   return (
     <div className="auth-overlay" onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="auth-modal radio-settings-modal">
-        <button className="auth-close" onClick={onClose} aria-label="关闭">×</button>
+        <button className="auth-close" onClick={onClose} aria-label={copy('close')}>×</button>
         <div className="auth-head">
-          <div className="auth-title serif">Melo 电台设置</div>
-          <div className="auth-sub">每个账号使用自己的模型 Key 和私有曲库。</div>
+          <div className="auth-title serif">{copy('settingsTitle')}</div>
+          <div className="auth-sub">{copy('settingsSub')}</div>
         </div>
 
-        {!user && <div className="radio-config-note radio-config-warn">请先登录，再配置 AI 电台。</div>}
+        {!user && <div className="radio-config-note radio-config-warn">{copy('signInConfig')}</div>}
 
         <label className="auth-label">DeepSeek API Key
           <input type="password" value={keyDraft} onChange={(event) => setKeyDraft(event.target.value)}
             placeholder="sk-…" autoComplete="off" spellCheck="false" />
         </label>
-        <div className="radio-config-note">默认只存当前标签页；不会写入 Supabase、构建产物或日志。</div>
+        <div className="radio-config-note">{copy('keyNote')}</div>
         <div className="radio-setting-actions">
-          <button className="btn" onClick={testKey} disabled={busy}>测试连接</button>
-          <button className="btn" onClick={clearKey} disabled={busy || (!keyDraft && !apiKey)}>清除 Key</button>
+          <button className="btn" onClick={testKey} disabled={busy}>{copy('testConnection')}</button>
+          <button className="btn" onClick={clearKey} disabled={busy || (!keyDraft && !apiKey)}>{copy('clearKey')}</button>
         </div>
 
-        <label className="auth-label">模型
+        <label className="auth-label">{copy('model')}
           <select value={model} onChange={(event) => setModel(event.target.value)}>
-            <option value="deepseek-v4-flash">DeepSeek V4 Flash · 快速</option>
-            <option value="deepseek-v4-pro">DeepSeek V4 Pro · 更强</option>
+            <option value="deepseek-v4-flash">{copy('modelFast')}</option>
+            <option value="deepseek-v4-pro">{copy('modelStrong')}</option>
           </select>
         </label>
 
         <div className="radio-taste-section">
           <div className="radio-library-head">
             <div>
-              <div className="auth-label">我的音乐口味</div>
-              <div className="radio-config-note">
-                从你自己的歌单提取歌名与歌手，让 DS 分析语言比例、常听歌手和曲风。不会上传音频、Cookie 或登录凭证。
-              </div>
+              <div className="auth-label">{copy('tasteTitle')}</div>
+              <div className="radio-config-note">{copy('tasteNote')}</div>
             </div>
-            {taste && <span className="radio-source-ready">已有画像</span>}
+            {taste && <span className="radio-source-ready">{copy('tasteReady')}</span>}
           </div>
           <div className="radio-setting-actions">
             <button className="btn" type="button" onClick={loadTastePlaylists}
-              disabled={busy || companionStatus !== 'online'}>读取我的歌单</button>
+              disabled={busy || companionStatus !== 'online'}>{copy('readPlaylists')}</button>
             <button className="btn btn-primary" type="button" onClick={analyzeTasteFromPlaylists}
-              disabled={busy || !selectedTastePlaylists.length}>让 DS 分析并保存</button>
+              disabled={busy || !selectedTastePlaylists.length}>{copy('analyzeTaste')}</button>
           </div>
           {tastePlaylists.length > 0 && <div className="radio-taste-playlists">
             {tastePlaylists.map((playlist) => {
@@ -424,65 +512,63 @@ function RadioSettings({
                 <input type="checkbox" checked={checked} disabled={capped || busy}
                   onChange={() => toggleTastePlaylist(playlist.id)} />
                 <span><b>{playlist.name}</b><small>
-                  {playlist.source === 'created' ? '我创建的' : '我收藏的'} · {playlist.trackCount} 首
+                  {copy(playlist.source === 'created' ? 'created' : 'collected')} · {copy('tracks', { count: playlist.trackCount })}
                 </small></span>
               </label>;
             })}
           </div>}
-          <label className="auth-label radio-taste-result">DS 生成的口味画像（可以微调）
+          <label className="auth-label radio-taste-result">{copy('tasteResult')}
             <textarea value={taste} onChange={(event) => setTaste(event.target.value)} rows="6"
-              maxLength="6000" placeholder="点击“读取我的歌单”，选择最能代表你的歌单后自动生成。" />
+              maxLength="6000" placeholder={copy('tastePlaceholder')} />
           </label>
         </div>
 
         <div className="radio-source-section">
           <div className="radio-library-head">
             <div>
-              <div className="auth-label">方式 A · 导入在线歌单</div>
-              <div className="radio-config-note">支持 YouTube 与 YouTube Music 的公开或不公开歌单链接。</div>
+              <div className="auth-label">{copy('sourceA')}</div>
+              <div className="radio-config-note">{copy('sourceANote')}</div>
             </div>
-            {playlistPreview && <span className="radio-source-ready">已识别</span>}
+            {playlistPreview && <span className="radio-source-ready">{copy('recognized')}</span>}
           </div>
           <input className="radio-playlist-input" value={playlistUrl}
             onChange={(event) => setPlaylistUrl(event.target.value)}
-            placeholder="粘贴 youtube.com 或 music.youtube.com 的歌单链接" maxLength="500" />
+            placeholder={copy('playlistPlaceholder')} maxLength="500" />
           {playlistError && <div className="radio-config-note radio-config-warn">{playlistError}</div>}
-          <div className="radio-config-note">
-            账号登录由 YouTube 官方页面完成；如需登录，请点“在 YouTube 打开”完成后返回。本站不会收到你的 YouTube 密码。私人歌单暂不支持。
-          </div>
+          <div className="radio-config-note">{copy('youtubeAuthNote')}</div>
         </div>
 
         <div className="radio-library-head">
           <div>
-            <div className="auth-label">方式 B · 网易云桌面桥</div>
-            <div className="radio-config-note">可选功能。音乐与登录凭证都留在你的电脑；网站只发送白名单播放指令。</div>
+            <div className="auth-label">{copy('sourceB')}</div>
+            <div className="radio-config-note">{copy('sourceBNote')}</div>
           </div>
           <span className={companionStatus === 'online' ? 'radio-source-ready' : ''}>
-            {companionStatus === 'online' ? '已连接' : companionStatus === 'checking' ? '连接中' : '未连接'}
+            {copy(companionStatus === 'online' ? 'connected' : companionStatus === 'checking' ? 'checking' : 'disconnected')}
           </span>
         </div>
         <div className="radio-companion-grid">
           <input value={companionUrl} onChange={(event) => setCompanionUrl(event.target.value)}
             placeholder={DEFAULT_COMPANION_URL} autoComplete="off" spellCheck="false" />
           <input type="password" value={companionToken} onChange={(event) => setCompanionToken(event.target.value)}
-            placeholder="粘贴 future-companion 显示的本机配对码" autoComplete="off" spellCheck="false" />
+            placeholder={copy('companionPlaceholder')} autoComplete="off" spellCheck="false" />
         </div>
         <div className="radio-setting-actions">
-          <button className="btn" onClick={testCompanion} disabled={busy || !companionToken}>测试本机桥</button>
-          <button className="btn" onClick={disconnectCompanion} disabled={busy || !companionToken}>断开</button>
+          <button className="btn" onClick={testCompanion} disabled={busy || !companionToken}>{copy('testCompanion')}</button>
+          <button className="btn" onClick={disconnectCompanion} disabled={busy || !companionToken}>{copy('disconnect')}</button>
         </div>
-        <div className="radio-config-note">配对码只保存在当前标签页，不会上传到 Supabase、DeepSeek 或 Cloudflare。</div>
+        <div className="radio-config-note">{copy('companionNote')}</div>
 
         <div className="radio-library-head">
           <div>
-            <div className="auth-label">方式 C · 上传私有音频</div>
-            <div className="radio-config-note">音频直接上传到你的 Supabase 私有存储，单曲不超过 30 MB。</div>
+            <div className="auth-label">{copy('sourceC')}</div>
+            <div className="radio-config-note">{copy('sourceCNote')}</div>
           </div>
-          <span>{tracks.length} 首</span>
+          <span>{copy('tracks', { count: tracks.length })}</span>
         </div>
         <div className="radio-upload-grid">
-          <input value={artist} onChange={(event) => setArtist(event.target.value)} placeholder="歌手" maxLength="120" />
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="歌名（必填）" maxLength="160" />
+          <input value={artist} onChange={(event) => setArtist(event.target.value)} placeholder={copy('artist')} maxLength="120" />
+          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={copy('requiredTitle')} maxLength="160" />
           <input ref={fileRef} type="file" accept="audio/*,.flac" onChange={(event) => setFile(event.target.files?.[0] || null)} />
         </div>
 
@@ -491,7 +577,7 @@ function RadioSettings({
             {tracks.map((track) => (
               <div className="radio-library-row" key={track.id}>
                 <span><b>{track.title}</b>{track.artist ? ` · ${track.artist}` : ''}</span>
-                <button onClick={() => removeTrack(track)} disabled={busy}>删除</button>
+                <button onClick={() => removeTrack(track)} disabled={busy}>{copy('delete')}</button>
               </div>
             ))}
           </div>
@@ -499,7 +585,7 @@ function RadioSettings({
 
         {message && <div className="radio-config-message">{message}</div>}
         <button className="btn btn-primary auth-submit" onClick={save} disabled={busy || !user || !!playlistError}>
-          {busy ? '处理中…' : file ? '保存设置并上传' : '保存设置'}
+          {copy(busy ? 'processing' : file ? 'saveUpload' : 'saveSettings')}
         </button>
       </div>
     </div>
@@ -524,7 +610,16 @@ function RadioView() {
   const [now, setNow] = _us(null);
   const [playing, setPlaying] = _us(false);
   const [err, setErr] = _us('');
-  const [lang, setLang] = _us(() => localStorage.getItem('melo_lang') || localStorage.getItem('claudio_lang') || 'zh');
+  const [lang, setLang] = _us(() => {
+    const appLanguage = getLocale();
+    try {
+      const saved = localStorage.getItem('melo_lang') || localStorage.getItem('claudio_lang') || '';
+      const next = appLanguage === 'en' ? 'en' : (saved || appLanguage);
+      localStorage.setItem('melo_lang', next);
+      localStorage.removeItem('claudio_lang');
+      return next;
+    } catch { return appLanguage; }
+  });
   const [companionUrl, setCompanionUrl] = _us(() => getCompanionConfig().url);
   const [companionToken, setCompanionToken] = _us(() => getCompanionConfig().token);
   const [companionStatus, setCompanionStatus] = _us(() => getCompanionConfig().token ? 'checking' : 'disconnected');
@@ -567,6 +662,7 @@ function RadioView() {
   catch { youtubePlaylist = null; }
   const youtubePlaylistId = youtubePlaylist?.id || '';
   const companionActiveIndex = resolveCompanionPlaylistIndex(companionPlayerState, companionPlaylist);
+  const copy = (key, vars) => meloText(lang, key, vars);
 
   const setLangPersist = (value) => {
     const next = value === 'en' ? 'en' : 'zh';
@@ -624,7 +720,9 @@ function RadioView() {
       const data = await loadRadioSettings();
       setTaste(data.profile?.taste || '');
       setModel(data.profile?.model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash');
-      if (data.profile?.language && !languageChoiceRef.current) setLangPersist(data.profile.language);
+      let localLanguage = '';
+      try { localLanguage = localStorage.getItem('melo_lang') || ''; } catch { /* ignore */ }
+      if (data.profile?.language && !languageChoiceRef.current && !localLanguage) setLangPersist(data.profile.language);
       setPlaylistUrl(data.profile?.playlist_provider === 'youtube' ? (data.profile.playlist_url || '') : '');
       setTracks(data.tracks || []);
       setSetupError('');
@@ -804,7 +902,7 @@ function RadioView() {
   };
 
   const executeCompanionAction = async (action, query = '', queries = [], options = {}) => {
-    if (companionStatus !== 'online') throw new Error('本机桥尚未连接，请先在设置里测试连接');
+    if (companionStatus !== 'online') throw new Error(copy('companionNotConnected'));
     const blocksUi = options.blockUi ?? ['search_and_play', 'play_daily'].includes(action);
     if (blocksUi) setCompanionBusy(true);
     setErr('');
@@ -882,9 +980,7 @@ function RadioView() {
     const target = companionPlaylist[index];
     if (!target || companionStatus !== 'online') return null;
     const playbackIndex = Number.isInteger(target.playbackIndex) ? target.playbackIndex : index;
-    const intro = target.intro || (langRef.current === 'en'
-      ? `Let’s switch to ${target.title || target.query}.`
-      : `接下来换到 ${target.title || target.query}。`);
+    const intro = target.intro || meloText(langRef.current, 'nextIntro', { title: target.title || target.query });
     const token = ++companionAnnouncementTokenRef.current;
     companionControlTokenRef.current += 1;
     companionControlPendingRef.current = false;
@@ -1012,7 +1108,7 @@ function RadioView() {
     const player = youtubePlayerRef.current;
     if (!player) {
       pendingYoutubeActionRef.current = action;
-      setErr('YouTube 播放器还在准备；如果浏览器阻止自动播放，请先在播放器里点一次播放。');
+      setErr(copy('youtubePreparing'));
       return false;
     }
     pendingYoutubeActionRef.current = '';
@@ -1026,7 +1122,7 @@ function RadioView() {
       setErr('');
       return true;
     } catch {
-      setErr('无法控制 YouTube 播放器，请先在播放器里点一次播放。');
+      setErr(copy('youtubeControlFailed'));
       return false;
     }
   };
@@ -1059,7 +1155,7 @@ function RadioView() {
     if (token !== playTokenRef.current) return;
     if (track.url && musicRef.current) {
       musicRef.current.src = track.url;
-      musicRef.current.play().catch(() => setErr('浏览器未允许播放，请点一下播放器。'));
+      musicRef.current.play().catch(() => setErr(copy('browserPlayFailed')));
     } else if (index + 1 < list.length) playAt(index + 1, list);
   };
 
@@ -1109,7 +1205,7 @@ function RadioView() {
 
     if (!apiKey) { setSettingsOpen(true); return; }
     setThinking(true);
-    setLog((items) => [...items, { role: 'you', text: message || '（随便放点）' }]);
+    setLog((items) => [...items, { role: 'you', text: message || copy('randomMessage') }]);
     try {
       const data = await radioApi('/chat', {
         key: apiKey,
@@ -1171,9 +1267,7 @@ function RadioView() {
           if (first) {
             announcedCompanionIndexesRef.current = new Set([0]);
             previewCompanionTrack(first, 0, resolved.length);
-            const firstIntro = first.intro || (langRef.current === 'en'
-              ? `Let’s begin with ${first.title || first.query}.`
-              : `先从 ${first.title || first.query} 开始。`);
+            const firstIntro = first.intro || meloText(langRef.current, 'firstIntro', { title: first.title || first.query });
             if (firstIntro) {
               setLog((items) => [...items, { role: 'melo', text: firstIntro, kind: 'intro' }]);
               await speak(firstIntro);
@@ -1223,10 +1317,10 @@ function RadioView() {
     ? companionSeekDraft : Number(companionPlayerState?.position) || 0;
   const recommendationIsCompanion = companionPlaylist.length > 0;
   const quicks = [
-    { label: '🎧 随便放点', text: '' },
-    { label: '💻 我在工作', text: '我在专注工作，给我点不分心的' },
-    { label: '😮‍💨 我有点累', text: '今天有点累，来点温柔的' },
-    { label: '🌙 深夜了', text: '深夜了，放点适合现在的' },
+    { label: copy('randomLabel'), text: '' },
+    { label: copy('workLabel'), text: copy('workPrompt') },
+    { label: copy('tiredLabel'), text: copy('tiredPrompt') },
+    { label: copy('nightLabel'), text: copy('nightPrompt') },
   ];
 
   return (
@@ -1243,33 +1337,33 @@ function RadioView() {
 
       <div className="hero">
         <div>
-          <div className="greeting"><span className="serif accent">Melo</span> · 你的 AI 电台</div>
-          <div className="greeting-sub">懂你的当下，你的私人AI电台。</div>
+          <div className="greeting"><span className="serif accent">Melo</span> · {copy('pageTitle')}</div>
+          <div className="greeting-sub">{copy('pageSub')}</div>
         </div>
         <div className="radio-hero-right">
-          <button className="radio-settings-btn" onClick={() => setSettingsOpen(true)}>设置</button>
-          <div className="radio-lang" role="group" aria-label="Melo 语言">
+          <button className="radio-settings-btn" onClick={() => setSettingsOpen(true)}>{copy('settings')}</button>
+          <div className="radio-lang" role="group" aria-label={copy('languageLabel')}>
             <button className={`radio-lang-btn ${lang === 'zh' ? 'active' : ''}`} onClick={() => changeMeloLanguage('zh')}>中</button>
             <button className={`radio-lang-btn ${lang === 'en' ? 'active' : ''}`} onClick={() => changeMeloLanguage('en')}>EN</button>
           </div>
           <div className={`radio-status radio-status-${status}`}>
             <span className="dot" />
-            {status === 'signin' && '请登录'}
-            {status === 'config' && '待配置'}
-            {status === 'online' && '云端在线'}
-            {status === 'connecting' && '连接中…'}
-            {status === 'offline' && 'Worker 离线'}
+            {status === 'signin' && copy('statusSignin')}
+            {status === 'config' && copy('statusConfig')}
+            {status === 'online' && copy('statusOnline')}
+            {status === 'connecting' && copy('statusConnecting')}
+            {status === 'offline' && copy('statusOffline')}
           </div>
           {companionToken && <div className={`radio-status radio-status-${companionStatus === 'online' ? 'online' : companionStatus}`}>
             <span className="dot" />
-            {companionStatus === 'online' ? '本机已连接' : companionStatus === 'checking' ? '本机连接中…' : '本机未连接'}
+            {copy(companionStatus === 'online' ? 'localOnline' : companionStatus === 'checking' ? 'localChecking' : 'localOffline')}
           </div>}
         </div>
       </div>
 
-      {status === 'signin' && <div className="radio-offline-hint">登录账号后，每个账号可以使用自己的 DeepSeek Key 与私有曲库。</div>}
-      {status === 'config' && <div className="radio-offline-hint">还差一步：打开「设置」，输入你自己的 DeepSeek API Key。</div>}
-      {status === 'offline' && <div className="radio-offline-hint">没有连上 Cloudflare Worker。开发时请同时运行前端和 Worker。</div>}
+      {status === 'signin' && <div className="radio-offline-hint">{copy('hintSignin')}</div>}
+      {status === 'config' && <div className="radio-offline-hint">{copy('hintConfig')}</div>}
+      {status === 'offline' && <div className="radio-offline-hint">{copy('hintOffline')}</div>}
       {setupError && <div className="radio-offline-hint">{setupError}</div>}
 
       <div className="radio-now" style={{ '--rad-h': now ? hueFor(now) : 220 }}>
@@ -1285,10 +1379,10 @@ function RadioView() {
                   ? (lang === 'en' ? 'MELO INTRO' : 'MELO 串词')
                   : playing ? 'NOW PLAYING' : 'PAUSED'}
               </div>
-              <div className="radio-now-title">{now.title || '未知曲目'}</div>
+              <div className="radio-now-title">{now.title || copy('unknownTrack')}</div>
               <div className="radio-now-artist">{now.artist || ''}</div>
               {now.source === 'companion' && <>
-                <input className="radio-player-progress" type="range" aria-label="拖动播放进度"
+                <input className="radio-player-progress" type="range" aria-label={copy('progressLabel')}
                   min="0" max={Math.max(1, Number(companionPlayerState?.duration) || 1)} step="1"
                   value={Math.min(Math.max(0, companionPosition), Math.max(1, Number(companionPlayerState?.duration) || 1))}
                   style={{ '--radio-progress': `${Math.min(100, Math.max(0,
@@ -1314,20 +1408,20 @@ function RadioView() {
                   <span>{formatPlayerTime(companionPosition)}</span>
                   <span>{formatPlayerTime(companionPlayerState?.duration)}</span>
                 </div>
-                <div className="radio-player-controls" aria-label="网易云播放控制">
+                <div className="radio-player-controls" aria-label={copy('controlsLabel')}>
                   <div className="radio-player-transport">
-                    <button type="button" aria-label="上一首" title="上一首"
+                    <button type="button" aria-label={copy('previous')} title={copy('previous')}
                       onClick={() => stepCompanionWithIntro('previous').catch(() => {})}
                       disabled={companionStatus !== 'online'}>‹</button>
                     <button type="button" className="radio-player-main"
-                      aria-label={playing ? '暂停' : '继续'} title={playing ? '暂停' : '继续'}
+                      aria-label={copy(playing ? 'pause' : 'resume')} title={copy(playing ? 'pause' : 'resume')}
                       onClick={toggleCompanionPlayback}
                       disabled={companionStatus !== 'online'}>
                       {playing
                         ? <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
                         : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.8v12.4c0 .8.9 1.3 1.6.9l9.1-6.2a1.1 1.1 0 0 0 0-1.8L9.6 4.9c-.7-.4-1.6.1-1.6.9Z" /></svg>}
                     </button>
-                    <button type="button" aria-label="下一首" title="下一首"
+                    <button type="button" aria-label={copy('next')} title={copy('next')}
                       onClick={() => stepCompanionWithIntro('next').catch(() => {})}
                       disabled={companionStatus !== 'online'}>›</button>
                   </div>
@@ -1342,9 +1436,9 @@ function RadioView() {
                       }
                     }}>
                     <button type="button" className="radio-volume-button"
-                      aria-label={`调节音量，当前 ${companionVolume}`}
+                      aria-label={copy('volumeButton', { volume: companionVolume })}
                       aria-expanded={companionVolumeOpen}
-                      title={companionVolumeOpen ? '收起音量滑轨' : '展开音量滑轨'}
+                      title={copy(companionVolumeOpen ? 'collapseVolume' : 'expandVolume')}
                       onClick={() => setCompanionVolumeOpen((current) => !current)}
                       disabled={companionStatus !== 'online'}>
                       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1359,7 +1453,7 @@ function RadioView() {
                     </button>
                     {companionVolumeOpen && <>
                       <input type="range" min="0" max="100" step="1"
-                        aria-label="网易云播放音量"
+                        aria-label={copy('volumeSlider')}
                         aria-valuetext={`${companionVolume}%`}
                         value={companionVolume}
                         style={{ '--radio-volume': `${companionVolume}%` }}
@@ -1370,14 +1464,14 @@ function RadioView() {
                   </div>
                 </div>
               </>}
-              {now.unresolved && <div className="radio-warn">无法取得这首歌的临时播放链接，已跳过。</div>}
+              {now.unresolved && <div className="radio-warn">{copy('unresolved')}</div>}
             </div>
           </div>
         ) : <div className="radio-now-empty">{
-          tracks.length ? '跟 Melo 说句话，开始一段只属于你的电台。'
-            : companionStatus === 'online' ? '网易云本机桥已连接。可以说“播放每日推荐”或“在网易云播放起风了”。'
-            : youtubePlaylistId ? '歌单已导入。先在下方官方播放器点一次播放，之后就可以让 Melo 控制。'
-              : '在设置里连接网易云桌面桥、导入 YouTube 歌单或上传自己的音乐，再让 Melo 开始播放。'
+          tracks.length ? copy('emptyTracks')
+            : companionStatus === 'online' ? copy('emptyCompanion')
+            : youtubePlaylistId ? copy('emptyYoutube')
+              : copy('emptyDefault')
         }</div>}
         <audio ref={musicRef} controls onEnded={() => { setPlaying(false); if (idx + 1 < queue.length) playAt(idx + 1); }}
           onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
@@ -1398,12 +1492,12 @@ function RadioView() {
         <div className="radio-recommendation-list">
           {recommendationItems.map((track, index) => {
             const active = recommendationIndex === index;
-            const title = track.title || track.query || '待确认曲目';
+            const title = track.title || track.query || copy('fallbackTrack');
             const artist = track.artist || '';
             return <button type="button" key={`${track.id || track.query || title}:${index}`}
               className={`radio-recommendation-item ${active ? 'active' : ''}`}
               aria-current={active ? 'true' : undefined}
-              aria-label={`${lang === 'en' ? 'Play' : '播放'} ${title}${artist ? ` · ${artist}` : ''}`}
+              aria-label={`${copy('playTrack')} ${title}${artist ? ` · ${artist}` : ''}`}
               onClick={() => (recommendationIsCompanion
                 ? playCompanionRecommendation(index)
                 : playAt(index))}
@@ -1424,23 +1518,23 @@ function RadioView() {
         <div className="radio-external-head">
           <div>
             <div className="radio-now-kicker">YOUTUBE PLAYLIST</div>
-            <div className="radio-external-title">你的在线歌单</div>
+            <div className="radio-external-title">{copy('youtubeTitle')}</div>
           </div>
-          <a href={youtubePlaylist.url} target="_blank" rel="noreferrer">在 YouTube 打开 ↗</a>
+          <a href={youtubePlaylist.url} target="_blank" rel="noreferrer">{copy('youtubeOpen')}</a>
         </div>
-        <YouTubePlaylistPlayer playlistId={youtubePlaylistId} playerRef={youtubePlayerRef}
+        <YouTubePlaylistPlayer playlistId={youtubePlaylistId} language={lang} playerRef={youtubePlayerRef}
           onReady={handleYouTubeReady}
           onStateChange={(state) => setYoutubePlaying(state === 1)}
           onError={setErr} />
-        {!youtubeReady && <div className="radio-config-note">正在载入官方播放器…</div>}
-        <div className="radio-config-note">第一次请手动点一次播放；如需登录，先点右上角“在 YouTube 打开”。之后可以直接对 Melo 说“播放”“下一首”或“随机播放”。</div>
+        {!youtubeReady && <div className="radio-config-note">{copy('youtubeLoading')}</div>}
+        <div className="radio-config-note">{copy('youtubeNote')}</div>
       </div>}
 
       <div className="radio-log">
         {log.map((item, index) => <div key={index} className={`radio-bubble radio-bubble-${item.role}`}>
           {item.role === 'melo' && <span className="radio-dj-tag">DJ</span>}{item.text}
         </div>)}
-        {thinking && <div className="radio-bubble radio-bubble-melo radio-thinking">Melo 正在想…</div>}
+        {thinking && <div className="radio-bubble radio-bubble-melo radio-thinking">{copy('thinking')}</div>}
         {err && <div className="radio-err">{err}</div>}
       </div>
 
@@ -1449,8 +1543,8 @@ function RadioView() {
       <div className="radio-compose">
         <input value={input} onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => { if (event.key === 'Enter' && canSend) send(); }}
-          placeholder="跟 Melo 说点什么…（想听什么 / 现在的心情）" disabled={!canSend} maxLength="1200" />
-        <button onClick={() => send()} disabled={!canSend}>播</button>
+          placeholder={copy('inputPlaceholder')} disabled={!canSend} maxLength="1200" />
+        <button onClick={() => send()} disabled={!canSend}>{copy('play')}</button>
       </div>
     </div>
   );

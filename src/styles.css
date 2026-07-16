@@ -4152,7 +4152,13 @@ body.tod-night .cfm-message { color: #cdd0c6; }
 body.tod-night .account-gear { background: rgba(40, 48, 62, 0.85); border-color: rgba(255,255,255,0.12); color: #b0b3a8; }
 
 /* ===== 设置弹窗（src/settings.jsx，侧栏 ⚙ 打开） ===== */
-.settings-modal { max-width: 400px; }
+.settings-modal {
+  max-width: 400px;
+  max-height: min(86vh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
 .set-section { margin-bottom: 18px; }
 .set-section:last-child { margin-bottom: 4px; }
 .set-label {

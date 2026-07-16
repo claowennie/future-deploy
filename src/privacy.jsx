@@ -7,7 +7,7 @@ const { useState, useEffect } = React;
 let setPrivacyOpen = null;
 function openPrivacy() { if (setPrivacyOpen) setPrivacyOpen(true); }
 
-const UPDATED = '2026-07-15';
+const UPDATED = '2026-07-16';
 
 function ZhBody() {
   return (
@@ -32,7 +32,7 @@ function ZhBody() {
       <p>• <b>删除</b>：注销账号会永久删除云端数据、笔记图片、私有电台音频及登录账号，无法恢复。</p>
 
       <h4>联系</h4>
-      <p>隐私或数据请求：<b>cwm221382@gmail.com</b>。</p>
+      <p>隐私或数据请求：<b>claowennie@gmail.com</b>。</p>
     </div>
   );
 }
@@ -60,7 +60,7 @@ function EnBody() {
       <p>• <b>Delete</b>: deleting your account permanently removes cloud data, note images, private radio audio, and the account. This cannot be undone.</p>
 
       <h4>Contact</h4>
-      <p>Privacy or data requests: <b>cwm221382@gmail.com</b>.</p>
+      <p>Privacy or data requests: <b>claowennie@gmail.com</b>.</p>
     </div>
   );
 }
