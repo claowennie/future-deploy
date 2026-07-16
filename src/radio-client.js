@@ -80,7 +80,7 @@ export function clearDeepSeekKey() {
   setDeepSeekKey('');
 }
 
-export async function radioApi(path, { key, body } = {}) {
+export async function radioApi(path, { key, ttsKey, body } = {}) {
   const { session } = await authContext();
   const response = await fetch(`/api/radio${path}`, {
     method: body === undefined ? 'GET' : 'POST',
@@ -88,11 +88,16 @@ export async function radioApi(path, { key, body } = {}) {
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       Authorization: `Bearer ${session.access_token}`,
       ...(key ? { 'X-DeepSeek-Key': key } : {}),
+      ...(ttsKey ? { 'X-TTS-Key': ttsKey } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(payload?.error || `请求失败（${response.status}）`);
+  if (!response.ok) {
+    const error = new Error(payload?.error || `请求失败（${response.status}）`);
+    error.code = payload?.code || '';
+    throw error;
+  }
   return payload;
 }
 

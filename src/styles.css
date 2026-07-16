@@ -3629,6 +3629,17 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
 .radio-config-note { margin-top: 7px; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
 .radio-config-warn { color: var(--danger); }
 .radio-setting-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.radio-secret-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.radio-secret-row .btn { min-width: 68px; padding-inline: 12px; }
+.radio-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
 .radio-source-section { margin-top: 2px; }
 .radio-playlist-input { margin-top: 12px; }
 .radio-companion-grid {
@@ -3757,6 +3768,7 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
   .radio-hero-right { flex-wrap: wrap; justify-content: flex-end; }
   .radio-upload-grid { grid-template-columns: 1fr; }
   .radio-companion-grid { grid-template-columns: 1fr; }
+  .radio-voice-grid { grid-template-columns: 1fr; gap: 0; }
   .radio-settings-modal { max-height: 92vh; }
   .radio-settings-modal > .modal-scroll-body { max-height: calc(92vh - 16px); }
   .radio-recommendation-track { align-items: flex-start; flex-direction: column; gap: 2px; }

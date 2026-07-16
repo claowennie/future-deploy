@@ -5,10 +5,12 @@ import {
 import { buildRadioPrompt, filterRecentCompanionPlaylist } from '../worker/radio-prompt.js';
 import radioWorker from '../worker/index.js';
 import { parseYouTubePlaylistUrl } from '../src/radio-client.js';
+import { normalizeTtsConfig, ttsVoiceForLanguage } from '../src/tts-client.js';
 import {
   isCompanionTrackNearEnd, mapCompanionVolumeToPlayback, markCompanionPlaybackStarted,
   normalizeCompanionVolume,
 } from '../src/companion-client.js';
+import { buildTtsRequest, synthesizeTts, ttsApiKey } from '../worker/tts.js';
 
 const candidates = [
   { id: 'track-a', artist: 'Artist A', title: 'Song A', storage_path: 'user/track-a.mp3' },
@@ -43,6 +45,33 @@ assert.equal(mapCompanionVolumeToPlayback(0), 0);
 assert.equal(mapCompanionVolumeToPlayback(10), 45);
 assert.equal(mapCompanionVolumeToPlayback(50), 78);
 assert.equal(mapCompanionVolumeToPlayback(100), 100);
+
+const defaultTts = normalizeTtsConfig({});
+assert.equal(defaultTts.provider, 'google');
+assert.equal(defaultTts.googleVoiceZh, 'Aoede');
+assert.equal(ttsVoiceForLanguage({ provider: 'minimax' }, 'en'), 'English_CalmWoman');
+const googleTtsRequest = buildTtsRequest({
+  provider: 'google', text: '你好', language: 'zh', voice: 'Kore', region: 'cn',
+});
+assert.equal(googleTtsRequest.body.voice.name, 'cmn-CN-Chirp3-HD-Kore');
+const minimaxTtsRequest = buildTtsRequest({
+  provider: 'minimax', text: 'Hello', language: 'en', voice: 'English_Graceful_Lady', region: 'global',
+});
+assert.equal(minimaxTtsRequest.endpoint, 'https://api.minimax.io/v1/t2a_v2');
+assert.equal(minimaxTtsRequest.body.language_boost, 'English');
+assert.equal(ttsApiKey(new Request('https://future.example', {
+  headers: { 'X-TTS-Key': 'valid-example-key-123' },
+})), 'valid-example-key-123');
+const normalizedAudio = await synthesizeTts({
+  apiKey: 'google-example-key', provider: 'google', text: 'Hello', language: 'en', voice: 'Aoede',
+}, async (url, options) => {
+  assert.match(url, /texttospeech\.googleapis\.com/);
+  assert.equal(JSON.parse(options.body).voice.name, 'en-US-Chirp3-HD-Aoede');
+  return new Response(JSON.stringify({ audioContent: 'SUQz' }), {
+    status: 200, headers: { 'Content-Type': 'application/json' },
+  });
+});
+assert.equal(normalizedAudio.audioContent, 'SUQz');
 
 assert.deepEqual(markCompanionPlaybackStarted({
   ok: true,
@@ -230,6 +259,7 @@ assert.equal(healthResponse.headers.get('cache-control'), 'no-store');
 const health = await healthResponse.json();
 assert.deepEqual(health.models, ['deepseek-v4-flash', 'deepseek-v4-pro']);
 assert.deepEqual(health.musicProviders, ['supabase-storage', 'youtube-playlist', 'netease-local-companion']);
+assert.deepEqual(health.ttsProviders, ['google-chirp3-hd', 'minimax-speech-2.8-hd', 'browser']);
 
 const configResponse = await radioWorker.fetch(
   new Request('https://future.example/api/runtime-config.js'),

@@ -2,6 +2,7 @@ import {
   analyzeTaste, askDeepSeek, DeepSeekError, normalizeModel, testDeepSeekKey,
 } from './deepseek.js';
 import { buildRadioPrompt, filterRecentCompanionPlaylist } from './radio-prompt.js';
+import { synthesizeTts, TtsError, ttsApiKey } from './tts.js';
 import {
   bearerToken,
   loadRadioContext,
@@ -81,7 +82,7 @@ async function rateLimit(env, userId, route) {
 }
 
 function errorResponse(error) {
-  if (error instanceof DeepSeekError || error instanceof SupabaseError) {
+  if (error instanceof DeepSeekError || error instanceof SupabaseError || error instanceof TtsError) {
     return json({ error: error.message, code: error.code }, error.status);
   }
   return json({ error: '服务暂时不可用', code: 'internal_error' }, 500);
@@ -97,7 +98,8 @@ async function handleApi(request, env, ctx) {
       brain: 'DeepSeek BYOK',
       musicProvider: 'supabase-storage',
       musicProviders: ['supabase-storage', 'youtube-playlist', 'netease-local-companion'],
-      ttsProvider: 'browser',
+      ttsProvider: 'byok',
+      ttsProviders: ['google-chirp3-hd', 'minimax-speech-2.8-hd', 'browser'],
       models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
     });
   }
@@ -111,8 +113,20 @@ async function handleApi(request, env, ctx) {
   const token = bearerToken(request);
   const user = await verifySupabaseUser(env, token);
   await rateLimit(env, user.id, url.pathname);
-  const apiKey = deepSeekKey(request);
   const body = await requestBody(request);
+
+  if (url.pathname === `${API_PREFIX}/tts`) {
+    return json(await synthesizeTts({
+      apiKey: ttsApiKey(request),
+      provider: body.provider,
+      text: body.text,
+      language: body.language,
+      voice: body.voice,
+      region: body.region,
+    }));
+  }
+
+  const apiKey = deepSeekKey(request);
   const model = normalizeModel(body.model);
 
   if (url.pathname === `${API_PREFIX}/key/test`) {
