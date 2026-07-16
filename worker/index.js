@@ -98,8 +98,8 @@ async function handleApi(request, env, ctx) {
       brain: 'DeepSeek BYOK',
       musicProvider: 'supabase-storage',
       musicProviders: ['supabase-storage', 'youtube-playlist', 'netease-local-companion'],
-      ttsProvider: 'byok',
-      ttsProviders: ['google-chirp3-hd', 'minimax-speech-2.8-hd', 'browser'],
+      ttsProvider: 'browser',
+      ttsProviders: ['browser', 'google-chirp3-hd', 'minimax-speech-2.8-hd'],
       models: ['deepseek-v4-flash', 'deepseek-v4-pro'],
     });
   }

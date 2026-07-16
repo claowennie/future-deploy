@@ -47,7 +47,7 @@ assert.equal(mapCompanionVolumeToPlayback(50), 78);
 assert.equal(mapCompanionVolumeToPlayback(100), 100);
 
 const defaultTts = normalizeTtsConfig({});
-assert.equal(defaultTts.provider, 'google');
+assert.equal(defaultTts.provider, 'browser');
 assert.equal(defaultTts.googleVoiceZh, 'Aoede');
 assert.equal(ttsVoiceForLanguage({ provider: 'minimax' }, 'en'), 'English_CalmWoman');
 const googleTtsRequest = buildTtsRequest({
@@ -259,7 +259,8 @@ assert.equal(healthResponse.headers.get('cache-control'), 'no-store');
 const health = await healthResponse.json();
 assert.deepEqual(health.models, ['deepseek-v4-flash', 'deepseek-v4-pro']);
 assert.deepEqual(health.musicProviders, ['supabase-storage', 'youtube-playlist', 'netease-local-companion']);
-assert.deepEqual(health.ttsProviders, ['google-chirp3-hd', 'minimax-speech-2.8-hd', 'browser']);
+assert.equal(health.ttsProvider, 'browser');
+assert.deepEqual(health.ttsProviders, ['browser', 'google-chirp3-hd', 'minimax-speech-2.8-hd']);
 
 const configResponse = await radioWorker.fetch(
   new Request('https://future.example/api/runtime-config.js'),

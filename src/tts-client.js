@@ -26,7 +26,7 @@ export const MINIMAX_EN_VOICES = [
 ];
 
 export const DEFAULT_TTS_CONFIG = Object.freeze({
-  provider: 'google',
+  provider: 'browser',
   googleKey: '',
   googleVoiceZh: 'Aoede',
   googleVoiceEn: 'Aoede',

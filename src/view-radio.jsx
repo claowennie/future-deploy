@@ -48,8 +48,8 @@ const MELO_COPY = {
     close: '关闭', settingsTitle: 'Melo 电台设置', settingsSub: '每个账号使用自己的模型 Key 和私有曲库。',
     signInConfig: '请先登录，再配置 AI 电台。', keyNote: '默认只存当前标签页；不会写入 Supabase、构建产物或日志。',
     testConnection: '测试连接', clearKey: '清除 Key', model: '模型', modelFast: 'DeepSeek V4 Flash · 快速', modelStrong: 'DeepSeek V4 Pro · 更强',
-    voiceTitle: 'Melo 的声音', voiceNote: 'Google Chirp 3 HD 默认选中；没有 Key 或接口异常时自动使用浏览器免费语音。Key 只保存在当前标签页，不同步到账号或数据库。',
-    voiceProvider: '语音服务', providerGoogle: 'Google Chirp 3 HD · 默认', providerMinimax: 'MiniMax Speech 2.8 HD', providerBrowser: '浏览器免费语音',
+    voiceTitle: 'Melo 的声音', voiceNote: '默认使用浏览器免费语音，无需 Key。也可以切换到 Google Chirp 3 HD 或 MiniMax；云端接口异常时会自动回退到浏览器语音。Key 只保存在当前标签页，不同步到账号或数据库。',
+    voiceProvider: '语音服务', providerGoogle: 'Google Chirp 3 HD', providerMinimax: 'MiniMax Speech 2.8 HD', providerBrowser: '浏览器免费语音 · 默认', voiceFree: '免费',
     googleKey: 'Google Cloud Text-to-Speech API Key', minimaxKey: 'MiniMax API Key', voiceKeyPlaceholder: '粘贴你自己的 API Key',
     minimaxRegion: 'MiniMax 账号区域', minimaxChina: '中国站 · minimaxi.com', minimaxGlobal: '国际站 · minimax.io',
     chineseVoice: '中文声线', englishVoice: '英文声线', browserVoiceAuto: '浏览器将自动选择中英文最佳可用声线。',
@@ -95,8 +95,8 @@ const MELO_COPY = {
     close: 'Close', settingsTitle: 'Melo Radio Settings', settingsSub: 'Each account uses its own model key and private music library.',
     signInConfig: 'Sign in before configuring AI Radio.', keyNote: 'Stored in this tab only; never written to Supabase, build output, or logs.',
     testConnection: 'Test connection', clearKey: 'Clear key', model: 'Model', modelFast: 'DeepSeek V4 Flash · Faster', modelStrong: 'DeepSeek V4 Pro · Stronger',
-    voiceTitle: 'Melo voice', voiceNote: 'Google Chirp 3 HD is selected by default. Without a key, or if the API fails, Melo automatically falls back to the free browser voice. Keys stay in this tab and are never synced to your account or database.',
-    voiceProvider: 'Voice provider', providerGoogle: 'Google Chirp 3 HD · Default', providerMinimax: 'MiniMax Speech 2.8 HD', providerBrowser: 'Free browser voice',
+    voiceTitle: 'Melo voice', voiceNote: 'The free browser voice is the default and needs no key. You can switch to Google Chirp 3 HD or MiniMax; Melo automatically falls back to the browser voice if a cloud provider fails. Keys stay in this tab and are never synced to your account or database.',
+    voiceProvider: 'Voice provider', providerGoogle: 'Google Chirp 3 HD', providerMinimax: 'MiniMax Speech 2.8 HD', providerBrowser: 'Free browser voice · Default', voiceFree: 'FREE',
     googleKey: 'Google Cloud Text-to-Speech API Key', minimaxKey: 'MiniMax API Key', voiceKeyPlaceholder: 'Paste your own API key',
     minimaxRegion: 'MiniMax account region', minimaxChina: 'China · minimaxi.com', minimaxGlobal: 'Global · minimax.io',
     chineseVoice: 'Chinese voice', englishVoice: 'English voice', browserVoiceAuto: 'The browser will automatically choose the best available Chinese and English voices.',
@@ -603,14 +603,14 @@ function RadioSettings({
               <div className="auth-label">{copy('voiceTitle')}</div>
               <div className="radio-config-note">{copy('voiceNote')}</div>
             </div>
-            <span className="radio-source-ready">BYOK</span>
+            <span className="radio-source-ready">{ttsDraft.provider === 'browser' ? copy('voiceFree') : 'BYOK'}</span>
           </div>
 
           <label className="auth-label">{copy('voiceProvider')}
             <select value={ttsDraft.provider} onChange={(event) => changeTtsDraft({ provider: event.target.value })}>
+              <option value="browser">{copy('providerBrowser')}</option>
               <option value="google">{copy('providerGoogle')}</option>
               <option value="minimax">{copy('providerMinimax')}</option>
-              <option value="browser">{copy('providerBrowser')}</option>
             </select>
           </label>
 
