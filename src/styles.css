@@ -3628,6 +3628,7 @@ body.tod-night .growth-stage-days { color: #c4c7bd; }
 .radio-settings-modal textarea:focus { outline: none; border-color: var(--accent); }
 .radio-config-note { margin-top: 7px; color: var(--ink-soft); font-size: 12px; line-height: 1.55; }
 .radio-config-warn { color: var(--danger); }
+.radio-voice-message { margin-top: 10px; }
 .radio-setting-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .radio-secret-row {
   display: grid;

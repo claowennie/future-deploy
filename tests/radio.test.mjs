@@ -72,6 +72,24 @@ const normalizedAudio = await synthesizeTts({
   });
 });
 assert.equal(normalizedAudio.audioContent, 'SUQz');
+await assert.rejects(() => synthesizeTts({
+  apiKey: 'minimax-example-key', provider: 'minimax', text: 'Hello', language: 'en',
+  voice: 'English_CalmWoman', region: 'global',
+}, async () => new Response(JSON.stringify({
+  data: null,
+  base_resp: { status_code: 1008, status_msg: 'insufficient balance' },
+}), { status: 200, headers: { 'Content-Type': 'application/json' } })), (error) => (
+  error.code === 'tts_quota_exhausted' && error.status === 402
+));
+await assert.rejects(() => synthesizeTts({
+  apiKey: 'minimax-example-key', provider: 'minimax', text: 'Hello', language: 'en',
+  voice: 'English_CalmWoman', region: 'global',
+}, async () => new Response(JSON.stringify({
+  data: null,
+  base_resp: { status_code: 1004, status_msg: 'invalid API key' },
+}), { status: 200, headers: { 'Content-Type': 'application/json' } })), (error) => (
+  error.code === 'tts_key_invalid' && error.status === 401
+));
 
 assert.deepEqual(markCompanionPlaybackStarted({
   ok: true,

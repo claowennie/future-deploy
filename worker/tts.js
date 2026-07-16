@@ -94,17 +94,28 @@ function hexToBase64(hex) {
   return btoa(binary);
 }
 
+function upstreamError(message, status = 502) {
+  const detail = String(message || '');
+  const invalidKey = status === 401 || status === 403
+    || /api.?key|permission|credential|unauth|鉴权|密钥/i.test(detail);
+  if (invalidKey) return new TtsError('语音 API Key 无效或没有调用权限', 401, 'tts_key_invalid');
+  if (status === 402 || status === 429
+    || /balance|credit|quota|insufficient|recharge|billing|subscription|余额|额度|欠费|充值|点数/i.test(detail)) {
+    return new TtsError('语音账户没有可用额度', 402, 'tts_quota_exhausted');
+  }
+  if (/model|voice|parameter|not support|unsupported|模型|音色|参数|不支持/i.test(detail)) {
+    return new TtsError('当前语音模型或声线不可用', 422, 'tts_configuration_invalid');
+  }
+  return new TtsError('语音服务暂时不可用，请稍后再试', 502, 'tts_upstream_error');
+}
+
 async function upstreamJson(response) {
   const payload = await response.json().catch(() => null);
-  if (response.ok) return payload;
   const message = payload?.error?.message || payload?.base_resp?.status_msg || '';
-  const invalidKey = response.status === 401 || response.status === 403
-    || /api.?key|permission|credential|unauth|鉴权|密钥/i.test(message);
-  throw new TtsError(
-    invalidKey ? '语音 API Key 无效或没有调用权限' : '语音服务暂时不可用，请稍后再试',
-    invalidKey ? 401 : 502,
-    invalidKey ? 'tts_key_invalid' : 'tts_upstream_error',
-  );
+  if (!response.ok) throw upstreamError(message, response.status);
+  const providerStatus = Number(payload?.base_resp?.status_code || 0);
+  if (providerStatus !== 0) throw upstreamError(message, 502);
+  return payload;
 }
 
 export async function synthesizeTts({ apiKey, provider, text, language, voice, region }, fetchImpl = fetch) {
