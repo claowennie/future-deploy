@@ -22,7 +22,10 @@ function detectLocale() {
       if (saved && PACKS[saved]) return saved;
     }
   } catch { /* ignore */ }
-  if (typeof navigator !== 'undefined' && navigator.language) {
+  // Modern Node.js also exposes a global navigator. Only use its language in
+  // an actual browser; server-side tools and tests keep the deterministic zh
+  // fallback documented above.
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && navigator.language) {
     return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
   }
   return 'zh';
