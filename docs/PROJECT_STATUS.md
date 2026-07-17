@@ -105,7 +105,7 @@ Core stack: React, Vite, JavaScript, CSS, PWA, Cloudflare Workers and Static Ass
 - User rows and private audio are isolated with Supabase RLS.
 - Browser and cloud TTS receive only the text required for synthesis.
 - Future Companion accepts only paired, allowlisted commands and keeps NetEase credentials/audio local.
-- The old `workers.dev` origin is retained in Companion v0.6.1 only for migration compatibility.
+- The old `workers.dev` origin is retained in Companion v0.6.2 only for migration compatibility.
 
 ## Completed iteration history
 
@@ -142,18 +142,18 @@ Core stack: React, Vite, JavaScript, CSS, PWA, Cloudflare Workers and Static Ass
 
 ## Future Companion release
 
-Current public release: `v0.6.1`
+Current public release: `v0.6.2`
 
 Download:
 
-<https://future-planner.claireeek.com/downloads/future-companion-windows-v0.6.1.zip>
+<https://future-planner.claireeek.com/downloads/future-companion-windows-v0.6.2.zip>
 
 ```text
-Size:    16,206 bytes
-SHA-256: 69175828E6A2514051228D15B6B1281C988E2E61C25E4F402604F701851359A5
+Size:    15,615 bytes
+SHA-256: 0F608BEEAFAB4BCD3F11ABE2993C6A2A2318D329628C57FD08DBAA29A76880AE
 ```
 
-Default allowed website origins in v0.6.1:
+Default allowed website origins in v0.6.2:
 
 ```text
 https://future-planner.claireeek.com
@@ -162,7 +162,7 @@ http://localhost:5173
 http://127.0.0.1:5173
 ```
 
-Users running v0.6.0 must download v0.6.1 before connecting from the custom domain, because v0.6.0 does not allow the new origin.
+Users running v0.6.0 must download v0.6.2 before connecting from the custom domain, because v0.6.0 does not allow the new origin.
 
 When releasing another Companion version:
 

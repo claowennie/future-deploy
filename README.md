@@ -113,13 +113,13 @@ POST /api/radio/tts
 
 ### Future Companion
 
-[下载 Future Companion Windows v0.6.1](https://future-planner.claireeek.com/downloads/future-companion-windows-v0.6.1.zip) · [查看本机桥设计](./docs/netease-companion.md)
+[下载 Future Companion Windows v0.6.2](https://future-planner.claireeek.com/downloads/future-companion-windows-v0.6.2.zip) · [查看本机桥设计](./docs/netease-companion.md)
 
 公开 ZIP 包含 Companion 源码、首次安装向导、独立重新登录脚本和中英文 README，不包含 `.future-companion/config.json`、网易云 Cookie、App Private Key、API Key 或用户音频。
 
 ```text
-Size:    16,206 bytes
-SHA-256: 69175828E6A2514051228D15B6B1281C988E2E61C25E4F402604F701851359A5
+Size:    15,615 bytes
+SHA-256: 0F608BEEAFAB4BCD3F11ABE2993C6A2A2318D329628C57FD08DBAA29A76880AE
 ```
 
 ## Local Development

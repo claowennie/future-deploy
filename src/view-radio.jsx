@@ -42,8 +42,8 @@ import {
 const { useState: _us, useEffect: _ue, useRef: _ur } = React;
 const MUSIC_VOLUME = 0.55;
 const COMPANION_VOLUME_KEY = 'future_companion_volume';
-const COMPANION_DOWNLOAD_PATH = '/downloads/future-companion-windows-v0.6.1.zip';
-const COMPANION_DOWNLOAD_SHA256 = '69175828E6A2514051228D15B6B1281C988E2E61C25E4F402604F701851359A5';
+const COMPANION_DOWNLOAD_PATH = '/downloads/future-companion-windows-v0.6.2.zip';
+const COMPANION_DOWNLOAD_SHA256 = '0F608BEEAFAB4BCD3F11ABE2993C6A2A2318D329628C57FD08DBAA29A76880AE';
 let youtubeApiPromise = null;
 
 const MELO_COPY = {
@@ -67,7 +67,7 @@ const MELO_COPY = {
     sourceA: '方式 A · 导入在线歌单', sourceANote: '支持 YouTube 与 YouTube Music 的公开或不公开歌单链接。', recognized: '已识别',
     playlistPlaceholder: '粘贴 youtube.com 或 music.youtube.com 的歌单链接', youtubeAuthNote: '账号登录由 YouTube 官方页面完成；如需登录，请点“在 YouTube 打开”完成后返回。本站不会收到你的 YouTube 密码。私人歌单暂不支持。',
     sourceB: '方式 B · 网易云桌面桥', sourceBNote: '可选功能。音乐与登录凭证都留在你的电脑；网站只发送白名单播放指令。',
-    companionDownloadTitle: '下载 Future Companion', companionDownloadNote: 'Windows 10/11 · v0.6.1 · 16 KB 轻量安装包', companionDownload: '下载 Windows ZIP',
+    companionDownloadTitle: '下载 Future Companion', companionDownloadNote: 'Windows 10/11 · v0.6.2 · 16 KB 轻量安装包', companionDownload: '下载 Windows ZIP',
     companionGuide: '安装与配对指南', companionRequirements: '安装前准备', companionNode: 'Node.js 18+', companionMpv: 'mpv 播放器', companionNcm: '网易云 CLI 配置说明',
     companionStep1: '下载 ZIP 并完整解压，不要直接在压缩包预览窗口里运行。', companionStep2: '先安装 Node.js 18+ 与 mpv，再双击 setup-companion.cmd。',
     companionStep3: '按终端提示填写网易云开放平台 App ID 与 Private Key，并用网易云音乐 App 扫码登录。', companionStep4: '双击 start-companion.cmd，保持终端窗口开启，复制窗口中的本机配对码。',
@@ -122,7 +122,7 @@ const MELO_COPY = {
     sourceA: 'Option A · Import an online playlist', sourceANote: 'Supports public and unlisted YouTube or YouTube Music playlist links.', recognized: 'Recognized',
     playlistPlaceholder: 'Paste a youtube.com or music.youtube.com playlist link', youtubeAuthNote: 'YouTube sign-in happens on the official YouTube page. If needed, choose “Open in YouTube,” sign in, then return. This site never receives your YouTube password. Private playlists are not supported yet.',
     sourceB: 'Option B · NetEase desktop companion', sourceBNote: 'Optional. Music and sign-in credentials stay on your computer; the site sends allowlisted playback commands only.',
-    companionDownloadTitle: 'Download Future Companion', companionDownloadNote: 'Windows 10/11 · v0.6.1 · 16 KB lightweight package', companionDownload: 'Download Windows ZIP',
+    companionDownloadTitle: 'Download Future Companion', companionDownloadNote: 'Windows 10/11 · v0.6.2 · 16 KB lightweight package', companionDownload: 'Download Windows ZIP',
     companionGuide: 'Setup & pairing guide', companionRequirements: 'Before you start', companionNode: 'Node.js 18+', companionMpv: 'mpv player', companionNcm: 'NetEase CLI setup',
     companionStep1: 'Download and fully extract the ZIP. Do not run it from inside the ZIP preview.', companionStep2: 'Install Node.js 18+ and mpv, then double-click setup-companion.cmd.',
     companionStep3: 'Enter your NetEase Open Platform App ID and Private Key when prompted, then scan the QR code with the NetEase app.', companionStep4: 'Double-click start-companion.cmd, keep the terminal open, and copy its local pairing code.',

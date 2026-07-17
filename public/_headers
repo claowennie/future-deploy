@@ -6,6 +6,6 @@
   Cross-Origin-Opener-Policy: same-origin
   Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.youtube.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; connect-src 'self' http://127.0.0.1:45731 http://localhost:45731 https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io; media-src 'self' blob: https://*.supabase.co; frame-src https://www.youtube.com; worker-src 'self' blob:; manifest-src 'self'
 
-/downloads/future-companion-windows-v0.6.1.zip
+/downloads/future-companion-windows-v0.6.2.zip
   Cache-Control: public, max-age=31536000, immutable
-  Content-Disposition: attachment; filename="future-companion-windows-v0.6.1.zip"
+  Content-Disposition: attachment; filename="future-companion-windows-v0.6.2.zip"
