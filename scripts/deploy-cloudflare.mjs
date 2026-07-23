@@ -3,7 +3,8 @@ import { writeFile, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const required = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY'];
+const required = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_SERVICE_ROLE_KEY'];
+const optional = ['RESEND_API_KEY', 'FEEDBACK_DIGEST_TO', 'FEEDBACK_DIGEST_FROM'];
 const missing = required.filter((name) => !String(process.env[name] || '').trim());
 
 if (missing.length) {
@@ -12,7 +13,9 @@ if (missing.length) {
 }
 
 const secrets = Object.fromEntries(
-  required.map((name) => [name, String(process.env[name]).trim()]),
+  [...required, ...optional]
+    .filter((name) => String(process.env[name] || '').trim())
+    .map((name) => [name, String(process.env[name]).trim()]),
 );
 const secretsFile = join(tmpdir(), `future-planner-secrets-${process.pid}.json`);
 

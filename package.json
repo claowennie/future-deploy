@@ -14,9 +14,9 @@
     "deploy": "npm run build && wrangler deploy",
     "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
     "lint": "eslint src",
-    "check:worker": "node --check worker/index.js && node --check worker/deepseek.js && node --check worker/supabase.js && node --check worker/radio-prompt.js && node --check worker/tts.js && node --check scripts/deploy-cloudflare.mjs",
+    "check:worker": "node --check worker/index.js && node --check worker/deepseek.js && node --check worker/supabase.js && node --check worker/radio-prompt.js && node --check worker/tts.js && node --check worker/feedback.js && node --check worker/feedback-digest.js && node --check scripts/deploy-cloudflare.mjs",
     "check": "npm run lint && npm test && npm run check:worker && npm run build",
-    "test": "node tests/dates.test.mjs && node tests/merge.test.mjs && node tests/i18n.test.mjs && node tests/radio.test.mjs && node tests/companion-package.test.mjs"
+    "test": "node tests/dates.test.mjs && node tests/merge.test.mjs && node tests/i18n.test.mjs && node tests/radio.test.mjs && node tests/feedback.test.mjs && node tests/companion-package.test.mjs"
   },
   "dependencies": {
     "@fontsource/geist": "^5.2.9",

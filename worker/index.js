@@ -4,6 +4,10 @@ import {
 import { buildRadioPrompt, filterRecentCompanionPlaylist } from './radio-prompt.js';
 import { synthesizeTts, TtsError, ttsApiKey } from './tts.js';
 import {
+  FeedbackError, insertDay7Survey, insertFeedback,
+} from './feedback.js';
+import { sendFeedbackDigest } from './feedback-digest.js';
+import {
   bearerToken,
   loadRadioContext,
   persistRadioTurn,
@@ -81,8 +85,23 @@ async function rateLimit(env, userId, route) {
   if (!result.success) throw new DeepSeekError('请求过于频繁，请稍后再试', 429, 'rate_limited');
 }
 
+async function feedbackRateLimit(env, request, anonymousTestId) {
+  if (!env.FEEDBACK_RATE_LIMITER?.limit) return;
+  const networkKey = String(request.headers.get('CF-Connecting-IP') || '').trim();
+  const key = networkKey || String(anonymousTestId || 'unknown');
+  const result = await env.FEEDBACK_RATE_LIMITER.limit({ key });
+  if (!result.success) {
+    throw new FeedbackError('提交有点频繁，请稍后再试', 429, 'feedback_rate_limited');
+  }
+}
+
 function errorResponse(error) {
-  if (error instanceof DeepSeekError || error instanceof SupabaseError || error instanceof TtsError) {
+  if (
+    error instanceof DeepSeekError ||
+    error instanceof SupabaseError ||
+    error instanceof TtsError ||
+    error instanceof FeedbackError
+  ) {
     return json({ error: error.message, code: error.code }, error.status);
   }
   return json({ error: '服务暂时不可用', code: 'internal_error' }, 500);
@@ -109,6 +128,14 @@ async function handleApi(request, env, ctx) {
   }
 
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+
+  if (url.pathname === '/api/feedback' || url.pathname === '/api/day7-survey') {
+    const body = await requestBody(request);
+    await feedbackRateLimit(env, request, body?.anonymous_test_id);
+    if (url.pathname === '/api/feedback') await insertFeedback(env, body);
+    else await insertDay7Survey(env, body);
+    return json({ ok: true }, 201);
+  }
 
   const token = bearerToken(request);
   const user = await verifySupabaseUser(env, token);
@@ -193,5 +220,10 @@ export default {
       catch (error) { return errorResponse(error); }
     }
     return env.ASSETS.fetch(request);
+  },
+  async scheduled(_controller, env, ctx) {
+    ctx.waitUntil(sendFeedbackDigest(env).catch((error) => {
+      console.error('Weekly feedback digest failed', error?.message || error);
+    }));
   },
 };

@@ -5,6 +5,7 @@
 import React from 'react';
 import { Sentry } from './sentry.js';
 import { t } from './i18n.js';
+import { openFeedback } from './feedback.jsx';
 
 const ERRLOG_KEY = 'error_log_v1';
 function logError(kind, message, stack) {
@@ -56,7 +57,13 @@ class ErrorBoundary extends React.Component {
         <div style={{ fontSize: 13, color: 'var(--ink-dim)', lineHeight: 1.7, marginBottom: 18 }}>
           {t('errorBoundary.body')}
         </div>
-        <button className="btn btn-primary" onClick={() => location.reload()}>{t('errorBoundary.reload')}</button>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => location.reload()}>{t('errorBoundary.reload')}</button>
+          <button
+            className="feedback-report-link"
+            onClick={() => openFeedback({ feedbackType: 'feature_broken' })}
+          >{t('errorBoundary.report')}</button>
+        </div>
         <details style={{ marginTop: 18, textAlign: 'left' }}>
           <summary style={{ fontSize: 11, color: 'var(--ink-soft)', cursor: 'pointer' }}>{t('errorBoundary.details')}</summary>
           <pre style={{

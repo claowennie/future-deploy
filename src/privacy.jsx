@@ -7,7 +7,7 @@ const { useState, useEffect } = React;
 let setPrivacyOpen = null;
 function openPrivacy() { if (setPrivacyOpen) setPrivacyOpen(true); }
 
-const UPDATED = '2026-07-16';
+const UPDATED = '2026-07-23';
 
 function ZhBody() {
   return (
@@ -16,6 +16,7 @@ function ZhBody() {
       <p>• <b>账号信息</b>：电子邮箱，用于登录和找回密码。</p>
       <p>• <b>应用数据</b>：待办、习惯、日记、笔记和 OKR 等。未登录时保存在浏览器；登录后同步到 Supabase。</p>
       <p>• <b>AI 电台数据</b>：电台偏好、YouTube 歌单链接、曲目元数据、最近对话与播放记录保存在 Supabase；音频保存在按账号隔离的私有存储桶。</p>
+      <p>• <b>产品反馈</b>：反馈类型、当前页面名称、最多 100 字的选填说明、随机匿名测试编号和提交时间；第 7 天问卷保存你主动选择的答案。反馈不会附带账号、邮箱、任务、日记、目标、习惯名称、截图或其他应用记录。</p>
 
       <h4>AI 服务密钥</h4>
       <p>你的 DeepSeek、Google Cloud TTS 或 MiniMax Key 只保存在当前浏览器标签页的会话存储中。所选服务的 Key 会随请求临时发送给本站的 Cloudflare Worker，再由 Worker 转发给对应服务；不会写入 Supabase、构建文件或应用日志。关闭标签页、退出账号或删除账号时会清除。</p>
@@ -27,6 +28,7 @@ function ZhBody() {
 
       <h4>错误报告</h4>
       <p>只有配置了 Sentry 的生产版本会发送错误堆栈；默认不收集个人身份信息，并在发送前过滤令牌、Key 和认证字段。电台请求正文不会被主动写入 Worker 日志。</p>
+      <p>你主动提交的产品反馈经 Cloudflare Worker 校验后保存到 Supabase。设备上的随机匿名测试编号只用于识别重复反馈，不与登录账号关联；清除浏览器数据或更换设备会生成新编号。每周摘要邮件只包含数量统计，原始反馈文本不会进入邮件。</p>
 
       <h4>你的控制权</h4>
       <p>• <b>导出</b>：设置中的“导出备份”可下载应用数据。</p>
@@ -45,6 +47,7 @@ function EnBody() {
       <p>• <b>Account information</b>: your email, used for sign-in and password recovery.</p>
       <p>• <b>App data</b>: tasks, habits, journal entries, notes, and OKRs. Signed-out data stays in the browser; signed-in data syncs to Supabase.</p>
       <p>• <b>AI radio data</b>: radio preferences, a YouTube playlist link, track metadata, recent radio messages, and play history in Supabase; audio files in a private, per-account storage bucket.</p>
+      <p>• <b>Product feedback</b>: feedback type, current page name, an optional message of up to 100 characters, a random anonymous test ID, and submission time. The day-7 survey stores only the answers you select. Feedback never attaches your account, email, tasks, journal entries, goals, habit names, screenshots, or other app records.</p>
 
       <h4>AI service keys</h4>
       <p>Your DeepSeek, Google Cloud TTS, or MiniMax key is stored in session storage for the current browser tab only. A request sends the selected provider's key temporarily to this site's Cloudflare Worker, which forwards it to that provider. Keys are not written to Supabase, build output, or application logs, and are cleared when the tab closes, you sign out, or you delete the account.</p>
@@ -56,6 +59,7 @@ function EnBody() {
 
       <h4>Error reports</h4>
       <p>Only production builds configured with Sentry send stack traces. PII collection is disabled, and tokens, keys, and authentication fields are filtered before sending. The Worker does not intentionally log radio request bodies.</p>
+      <p>Product feedback you choose to send is validated by the Cloudflare Worker and stored in Supabase. The random test ID on your device is used only to recognize repeat feedback and is not linked to your account. Clearing browser data or changing devices creates a new ID. Weekly digest emails contain counts only; raw feedback text is not emailed.</p>
 
       <h4>Your control</h4>
       <p>• <b>Export</b>: “Export backup” in Settings downloads app data.</p>

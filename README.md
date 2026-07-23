@@ -145,6 +145,7 @@ npm install
 2. [`supabase/radio-playlist-migration.sql`](./supabase/radio-playlist-migration.sql)：旧版电台表的歌单字段迁移
 3. [`supabase/delete_user.sql`](./supabase/delete_user.sql)：账号自助删除
 4. [`supabase/WEB_PUSH_SETUP.md`](./supabase/WEB_PUSH_SETUP.md)：可选 Web Push
+5. [`supabase/feedback.sql`](./supabase/feedback.sql)：匿名产品反馈、第 7 天问卷、RLS 与最近 7 天汇总视图
 
 复制前端公开配置：
 
@@ -168,9 +169,15 @@ Copy-Item .dev.vars.example .dev.vars
 ```dotenv
 SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
 SUPABASE_PUBLISHABLE_KEY=YOUR-SUPABASE-PUBLISHABLE-OR-ANON-KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR-SUPABASE-SECRET-OR-SERVICE-ROLE-KEY
+
+# 可选：每周一 09:00（台北时间）发送只含数量的反馈摘要
+RESEND_API_KEY=
+FEEDBACK_DIGEST_TO=
+FEEDBACK_DIGEST_FROM=Future Feedback <feedback@YOUR-VERIFIED-DOMAIN>
 ```
 
-所有 `VITE_*` 都会进入浏览器产物，只能填写公开配置。不要在 `.env.local` 或 `.dev.vars` 中保存 DeepSeek / TTS Key、Supabase `service_role` 或 Cloudflare Token。
+所有 `VITE_*` 都会进入浏览器产物，只能填写公开配置。`SUPABASE_SERVICE_ROLE_KEY` 只能放在不会提交的 `.dev.vars` 或 Cloudflare Secret 中，绝不能放进 `.env.local`、前端变量或仓库。DeepSeek / TTS Key 仍由用户在浏览器会话中临时提供。
 
 ### 2. Run locally
 
@@ -218,6 +225,12 @@ Root directory: /
 ```text
 SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
 SUPABASE_PUBLISHABLE_KEY=YOUR-SUPABASE-PUBLISHABLE-OR-ANON-KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR-SUPABASE-SECRET-OR-SERVICE-ROLE-KEY
+
+# 可选周报邮件
+RESEND_API_KEY=YOUR-RESEND-KEY
+FEEDBACK_DIGEST_TO=YOUR-EMAIL
+FEEDBACK_DIGEST_FROM=Future Feedback <feedback@YOUR-VERIFIED-DOMAIN>
 ```
 
 [`scripts/deploy-cloudflare.mjs`](./scripts/deploy-cloudflare.mjs) 会在构建环境的临时目录中生成 Wrangler Secrets 文件，部署后立即删除；值不会进入 Git 仓库、网页 bundle 或构建日志。
@@ -229,7 +242,7 @@ npm run check
 npm run deploy
 ```
 
-`wrangler.jsonc` 已配置 Static Assets、SPA fallback、`/api/*` Worker 优先、速率限制和 10% 可观测性采样。不要添加覆盖 `/api/*` 的全站缓存规则，并保留 `public/_headers` 中的 CSP 与安全响应头。
+`wrangler.jsonc` 已配置 Static Assets、SPA fallback、`/api/*` Worker 优先、速率限制、每周一 09:00（台北时间）的反馈摘要定时任务和 10% 可观测性采样。没有配置 Resend 三项 Secret 时，定时任务会安全跳过邮件发送；原始反馈始终只保存在 Supabase。不要添加覆盖 `/api/*` 的全站缓存规则，并保留 `public/_headers` 中的 CSP 与安全响应头。
 
 ## Roadmap
 

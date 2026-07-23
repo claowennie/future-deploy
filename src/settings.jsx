@@ -13,6 +13,7 @@ import { deleteAccount, signOutAndClear, RestorePicker } from './sync.jsx';
 import { t, getLocale, setLocale } from './i18n.js';
 import { getNotifPrefs, setNotifPrefs, notifSupported, notifPermission, requestNotifPermission } from './notify.js';
 import { pushSupported, getPushSubscription, subscribePush, unsubscribePush, syncPushPrefs } from './push.js';
+import { openFeedback } from './feedback.jsx';
 
 const { useEffect, useState } = React;
 
@@ -243,6 +244,17 @@ function SettingsModal({ open, onClose, signedIn }) {
               <button className="btn btn-ghost set-btn" onClick={loadSample}>{t('settings.loadSample')}</button>
               <button className="btn btn-ghost set-btn set-danger" onClick={clearLocal}>{t('settings.clearLocal')}</button>
             </div>
+          </div>
+
+          <div className="set-section">
+            <div className="set-label">{t('settings.helpLabel')}</div>
+            <div className="set-row">
+              <button className="btn btn-ghost set-btn" onClick={() => {
+                onClose();
+                setTimeout(() => openFeedback({ pageName: 'settings' }), 0);
+              }}>{t('settings.feedbackButton')}</button>
+            </div>
+            <div className="set-hint">{t('settings.feedbackHint')}</div>
           </div>
 
           <div className="set-section">

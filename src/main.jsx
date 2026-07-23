@@ -34,6 +34,7 @@ import './store.jsx';
 import './celebrate.jsx';
 import './modal.jsx';
 import './privacy.jsx';
+import './feedback.jsx';
 import './components.jsx';
 import './seasons.jsx';
 import './canonical.jsx';

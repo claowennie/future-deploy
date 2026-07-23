@@ -10,6 +10,7 @@ import { PrivacyHost } from './privacy.jsx';
 import { TreeStageUp, treeStageUp } from './celebrate.jsx';
 import { getStage, STAGE_NAMES } from './growth-tree.jsx';
 import { t } from './i18n.js';
+import { Day7SurveyHost, FeedbackHost } from './feedback.jsx';
 
 function App() {
   const store = useLocalState();
@@ -54,6 +55,7 @@ function App() {
   };
   // Let deep components (e.g. 今日页的 OKR 条) jump between views without prop drilling
   window.__appNavigate = navigate;
+  window.__futureFeedbackPage = view;
 
   // Apply seasonal + time-of-day class to body
   _ue(() => {
@@ -129,6 +131,8 @@ function App() {
       <Onboarding/>
       <ModalHost/>
       <PrivacyHost/>
+      <FeedbackHost/>
+      <Day7SurveyHost/>
       <TreeStageUp/>
       <window.AppTweaks/>
       {window.QuickCapture && <window.QuickCapture />}
